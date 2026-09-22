@@ -1,0 +1,15 @@
+.env
+.env.local
+.appdata/
+.local/
+.npm-cache/
+**/bin/
+**/obj/
+**/node_modules/
+**/.next/
+**/.turbo/
+**/coverage/
+*.user
+*.suo
+*.log
+*.tsbuildinfo

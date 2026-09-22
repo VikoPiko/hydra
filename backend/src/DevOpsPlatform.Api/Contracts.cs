@@ -1,0 +1,19 @@
+using DevOpsPlatform.Domain;
+
+namespace DevOpsPlatform.Api;
+
+public sealed record CreateProject(string Name, string? Description);
+public sealed record CreateEnvironment(string Name, EnvironmentType Type);
+public sealed record CreateComponent(string Name, string? Description, ComponentType Type, string? RepositoryUrl, string? Owner);
+public sealed record CreateDependency(Guid SourceComponentId, Guid TargetComponentId, DependencyType Type, DependencySource Source);
+public sealed record CreateDeployment(Guid EnvironmentId, Guid ComponentId, string Version, string? CommitSha,
+    string? ArtifactReference, DeploymentStatus Status, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt);
+public sealed record UpdateRuntime(HealthStatus HealthStatus, double? CpuPercent, double? MemoryPercent,
+    double? RequestRate, double? ErrorRatePercent, double? LatencyP95Ms);
+public sealed record TopologyMetrics(double? CpuPercent, double? MemoryPercent, double? RequestRate,
+    double? ErrorRatePercent, double? LatencyP95Ms);
+public sealed record TopologyNode(Guid Id, string Name, ComponentType Type, HealthStatus Health, string? Version,
+    string? Description, string? RepositoryUrl, string? Owner, TopologyMetrics Metrics);
+public sealed record TopologyEdge(Guid Id, Guid Source, Guid Target, DependencyType Type, DependencySource SourceKind);
+public sealed record TopologyResponse(Guid ProjectId, Guid EnvironmentId, DateTimeOffset GeneratedAt,
+    IReadOnlyList<TopologyNode> Nodes, IReadOnlyList<TopologyEdge> Edges);

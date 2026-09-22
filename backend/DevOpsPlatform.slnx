@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DevOpsPlatform.Api/DevOpsPlatform.Api.csproj" />
+    <Project Path="src/DevOpsPlatform.Application/DevOpsPlatform.Application.csproj" />
+    <Project Path="src/DevOpsPlatform.Domain/DevOpsPlatform.Domain.csproj" />
+    <Project Path="src/DevOpsPlatform.Infrastructure/DevOpsPlatform.Infrastructure.csproj" />
+    <Project Path="src/DevOpsPlatform.Persistence/DevOpsPlatform.Persistence.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DevOpsPlatform.IntegrationTests/DevOpsPlatform.IntegrationTests.csproj" />
+    <Project Path="tests/DevOpsPlatform.UnitTests/DevOpsPlatform.UnitTests.csproj" />
+  </Folder>
+</Solution>
