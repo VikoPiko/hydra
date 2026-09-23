@@ -13,7 +13,7 @@ public enum ProjectRole { Viewer, Contributor, Owner }
 public enum WorkItemType { UserStory, Task, Bug }
 public enum WorkItemState { New, Active, Resolved, Closed, Removed }
 public enum WorkItemPriority { Critical, High, Medium, Low }
-public enum WorkItemActivityType { Created, Updated, StateChanged, Assigned, TagAdded, TagRemoved }
+public enum WorkItemActivityType { Created, Updated, StateChanged, Assigned, TagAdded, TagRemoved, ComponentLinked, ComponentUnlinked }
 
 public sealed class WorkItem
 {
@@ -62,6 +62,12 @@ public sealed class WorkItemTag
 {
     public Guid WorkItemId { get; set; }
     public Guid TagId { get; set; }
+}
+
+public sealed class WorkItemComponentLink
+{
+    public Guid WorkItemId { get; set; }
+    public Guid ComponentId { get; set; }
 }
 
 public enum IterationState { Planned, Current, Completed }

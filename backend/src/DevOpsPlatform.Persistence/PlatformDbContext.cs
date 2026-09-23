@@ -13,6 +13,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<Iteration> Iterations => Set<Iteration>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<WorkItemTag> WorkItemTags => Set<WorkItemTag>();
+    public DbSet<WorkItemComponentLink> WorkItemComponentLinks => Set<WorkItemComponentLink>();
     public DbSet<SystemEnvironment> Environments => Set<SystemEnvironment>();
     public DbSet<SystemComponent> Components => Set<SystemComponent>();
     public DbSet<Dependency> Dependencies => Set<Dependency>();
@@ -106,6 +107,13 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             e.HasOne<WorkItem>().WithMany().HasForeignKey(x => x.WorkItemId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Tag>().WithMany().HasForeignKey(x => x.TagId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => x.TagId);
+        });
+        model.Entity<WorkItemComponentLink>(e =>
+        {
+            e.HasKey(x => new { x.WorkItemId, x.ComponentId });
+            e.HasOne<WorkItem>().WithMany().HasForeignKey(x => x.WorkItemId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<SystemComponent>().WithMany().HasForeignKey(x => x.ComponentId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.ComponentId);
         });
         model.Entity<SystemEnvironment>(e =>
         {

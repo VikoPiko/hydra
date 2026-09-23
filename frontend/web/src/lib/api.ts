@@ -20,6 +20,8 @@ export type ProjectMember = { userId: string; displayName: string; email: string
 export type Iteration = { id: string; name: string; state: "Planned" | "Current" | "Completed" };
 export type Tag = { id: string; name: string; colorToken: string | null };
 export type WorkItemTag = { workItemId: string; tagId: string };
+export type WorkItemComponentLink = { workItemId: string; componentId: string };
+export type ProjectActivity = { id: string; occurredAt: string; kind: "Operational" | "WorkItem"; summary: string; actorName: string | null; componentId: string | null; workItemId: string | null; environmentId: string | null };
 
 export const apiBase = "";
 

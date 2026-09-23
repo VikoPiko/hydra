@@ -197,6 +197,7 @@ public static partial class PlatformEndpoints
 
         MapLifecycleEndpoints(api, app.Environment.IsDevelopment());
         MapWorkItemEndpoints(api);
+        MapOperationalIntegrationEndpoints(api);
     }
 
     private static bool ValidName(string? name) => name?.Trim().Length is >= 2 and <= 120;

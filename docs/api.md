@@ -4,6 +4,8 @@ Project management (Version 2 slice): `GET /api/projects` lists active projects;
 
 Work-item endpoints, filters, state and assignment rules are documented in [work-items.md](work-items.md). All `/api/*` endpoints require a validated OIDC bearer token; project-scoped routes also require membership.
 
+Operational integration: `GET /api/projects/{projectId}/work-item-component-links` lists project links. `POST` or `DELETE /api/work-items/{workItemId}/components/{componentId}` adds or removes a same-project link. `GET /api/components/{componentId}/work-items` lists active linked work; `?includeClosed=true` includes history. `GET /api/projects/{projectId}/activity?limit=50` merges persisted operational and work-item events. See [operational-integration.md](operational-integration.md).
+
 Development OpenAPI JSON is served at `/openapi/v1.json`. Responses use ordinary JSON DTOs; errors use Problem Details. All IDs are GUIDs and enum values are JSON strings.
 
 | Capability | Endpoints |
@@ -17,6 +19,8 @@ Development OpenAPI JSON is served at `/openapi/v1.json`. Responses use ordinary
 | Deployments | `GET /api/projects/{projectId}/environments/{environmentId}/deployments`, `GET /api/components/{componentId}/deployments`, `POST /api/projects/{projectId}/deployments` |
 | Runtime state | `GET /api/projects/{projectId}/environments/{environmentId}/runtime`, `PUT /api/projects/{projectId}/environments/{environmentId}/components/{componentId}/runtime` |
 | Events | `GET /api/projects/{projectId}/environments/{environmentId}/events?limit=50` |
+| Project activity | `GET /api/projects/{projectId}/activity?limit=50` |
+| Component work | `GET /api/components/{componentId}/work-items`, `POST`/`DELETE /api/work-items/{workItemId}/components/{componentId}` |
 | SSE | `GET /api/projects/{projectId}/environments/{environmentId}/events/stream` |
 | Health | `GET /health/live`, `GET /health/ready`, `GET /health` |
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ReactFlow, Background, Controls, Handle, MiniMap, Position, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { apiBase, getJson, postJson, type Environment, type Impact, type OperationalEvent, type Project, type RuntimeState, type Topology, type TopologyNode, type Deployment } from "@/lib/api";
+import { apiBase, getJson, postJson, type Environment, type Impact, type OperationalEvent, type Project, type RuntimeState, type Topology, type TopologyNode, type Deployment, type WorkItem } from "@/lib/api";
 import { mapTopology } from "@/lib/graph";
 import { ProjectNav } from "./ProjectNav";
 
@@ -27,6 +27,7 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
   const [topology, setTopology] = useState<Topology | null>(null);
   const [events, setEvents] = useState<OperationalEvent[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [linkedItems, setLinkedItems] = useState<WorkItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [impact, setImpact] = useState<Impact | null>(null);
   const [search, setSearch] = useState("");
@@ -68,6 +69,14 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
     return () => { source.close(); setLive(false); };
   }, [projectId, environmentId, refresh]);
   useEffect(() => { setSelectedId(null); setImpact(null); }, [environmentId]);
+  useEffect(() => {
+    if (!selectedId) { setLinkedItems([]); return; }
+    let current = true;
+    getJson<WorkItem[]>(`/api/components/${selectedId}/work-items`)
+      .then(items => { if (current) setLinkedItems(items); })
+      .catch(cause => { if (current) setError(cause instanceof Error ? cause.message : "Unable to load linked work items."); });
+    return () => { current = false; };
+  }, [selectedId, refreshKey]);
   const graph = useMemo(() => topology ? mapTopology(topology, selectedId, impact, search) : { nodes: [], edges: [] }, [topology, selectedId, impact, search]);
   const selected = topology?.nodes.find(n => n.id === selectedId);
   const dependencies = topology?.edges.filter(e => e.source === selectedId) ?? [];
@@ -113,6 +122,7 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
         {impact && <div className="impact-results"><h3>Potentially affected</h3><strong>Direct</strong>{impact.directDependents.length ? impact.directDependents.map(x => <p key={x.id}>{x.name}</p>) : <p className="muted">None</p>}<strong>Indirect</strong>{impact.indirectDependents.length ? impact.indirectDependents.map(x => <p key={x.id}>{x.name}</p>) : <p className="muted">None</p>}</div>}
         {process.env.NEXT_PUBLIC_ENABLE_DEMO === "true" && <div className="demo-actions"><button onClick={() => simulate("degradation")}>Simulate degradation</button><button onClick={() => simulate("recovery")}>Restore health</button></div>}
         <div className="detail-group"><h3>Recent deployments</h3>{deployments.filter(d => d.componentId === selected.id).slice(0, 3).map(d => <div className="relation" key={d.id}>{d.version}<small>{d.status} · {new Date(d.startedAt).toLocaleString()}</small></div>)}</div>
+        <div className="detail-group"><h3>Active linked work</h3>{linkedItems.length ? linkedItems.map(item => <div className="relation" key={item.id}>#{item.sequenceNumber} {item.title}<small>{item.type} · {item.state} · {item.priority}</small></div>) : <p className="muted">No active work items linked to this component.</p>}<Link href={`/projects/${projectId}/boards`}>Open board →</Link></div>
         <div className="detail-group"><h3>Recent events</h3>{events.filter(e => e.componentId === selected.id).slice(0, 3).map(e => <div className="relation" key={e.id}>{e.title}<small>{new Date(e.occurredAt).toLocaleString()}</small></div>)}</div>
       </> : <div className="empty-detail"><span>◎</span><h2>Select a component</h2><p>Inspect health, deployment, dependencies, and potential impact.</p></div>}
     </aside></div>

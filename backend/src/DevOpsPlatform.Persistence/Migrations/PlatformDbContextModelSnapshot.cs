@@ -619,6 +619,21 @@ namespace DevOpsPlatform.Persistence.Migrations
                     b.ToTable("WorkItemActivities");
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.WorkItemComponentLink", b =>
+                {
+                    b.Property<Guid>("WorkItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComponentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("WorkItemId", "ComponentId");
+
+                    b.HasIndex("ComponentId");
+
+                    b.ToTable("WorkItemComponentLinks");
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.WorkItemTag", b =>
                 {
                     b.Property<Guid>("WorkItemId")
@@ -811,6 +826,21 @@ namespace DevOpsPlatform.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ActorUserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DevOpsPlatform.Domain.WorkItem", null)
+                        .WithMany()
+                        .HasForeignKey("WorkItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DevOpsPlatform.Domain.WorkItemComponentLink", b =>
+                {
+                    b.HasOne("DevOpsPlatform.Domain.SystemComponent", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("DevOpsPlatform.Domain.WorkItem", null)
                         .WithMany()

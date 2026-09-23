@@ -19,6 +19,45 @@ namespace DevOpsPlatform.IntegrationTests;
 public class ApiTests
 {
     [Fact]
+    public async Task ComponentLinksAndUnifiedActivityStayWithinProject()
+    {
+        await using var factory = new TestFactory();
+        using var alice = factory.CreateAuthenticatedClient();
+        using var bob = factory.CreateAuthenticatedClient("bob");
+        var project = await Post(alice, "/api/projects", new { name = "Linked Work" });
+        var other = await Post(alice, "/api/projects", new { name = "Other System" });
+        var projectId = project.GetProperty("id").GetGuid();
+        var otherId = other.GetProperty("id").GetGuid();
+        var payment = await Post(alice, $"/api/projects/{projectId}/components", new { name = "Payment Service", type = "Service" });
+        var unrelated = await Post(alice, $"/api/projects/{otherId}/components", new { name = "Billing Service", type = "Service" });
+        var componentId = payment.GetProperty("id").GetGuid();
+        var unrelatedId = unrelated.GetProperty("id").GetGuid();
+        var item = await Post(alice, $"/api/projects/{projectId}/work-items", new { type = "Bug", title = "Payment retry fails", priority = "Critical" });
+        var itemId = item.GetProperty("id").GetGuid();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await alice.PostAsync($"/api/work-items/{itemId}/components/{unrelatedId}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.PostAsync($"/api/work-items/{itemId}/components/{componentId}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.PostAsync($"/api/work-items/{itemId}/components/{componentId}", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.PostAsync($"/api/work-items/{itemId}/components/{componentId}", null)).StatusCode);
+        var links = await alice.GetFromJsonAsync<JsonElement[]>($"/api/projects/{projectId}/work-item-component-links");
+        Assert.Equal(componentId, Assert.Single(links!).GetProperty("componentId").GetGuid());
+        Assert.Single((await alice.GetFromJsonAsync<JsonElement[]>($"/api/components/{componentId}/work-items"))!);
+
+        var feed = await alice.GetFromJsonAsync<JsonElement[]>($"/api/projects/{projectId}/activity");
+        Assert.Contains(feed!, entry => entry.GetProperty("kind").GetString() == "Operational" &&
+            entry.GetProperty("summary").GetString()!.Contains("Payment Service"));
+        Assert.Contains(feed!, entry => entry.GetProperty("kind").GetString() == "WorkItem" &&
+            entry.GetProperty("summary").GetString()!.Contains("linked a component") &&
+            entry.GetProperty("summary").GetString()!.Contains("Payment Service"));
+
+        await alice.PatchAsJsonAsync($"/api/work-items/{itemId}/state", new { state = "Closed" });
+        Assert.Empty((await alice.GetFromJsonAsync<JsonElement[]>($"/api/components/{componentId}/work-items"))!);
+        Assert.Single((await alice.GetFromJsonAsync<JsonElement[]>($"/api/components/{componentId}/work-items?includeClosed=true"))!);
+        Assert.Equal(HttpStatusCode.NoContent, (await alice.DeleteAsync($"/api/work-items/{itemId}/components/{componentId}")).StatusCode);
+        Assert.Empty((await alice.GetFromJsonAsync<JsonElement[]>($"/api/projects/{projectId}/work-item-component-links"))!);
+    }
+
+    [Fact]
     public async Task WorkItemCrudFiltersStateAssignmentAndHistory()
     {
         await using var factory = new TestFactory();
