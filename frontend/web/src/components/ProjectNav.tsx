@@ -3,6 +3,7 @@ import Link from "next/link";
 export function ProjectNav({ projectId, active }: { projectId: string; active: string }) {
   const items = [
     ["Overview", `/projects/${projectId}`],
+    ["Boards", `/projects/${projectId}/boards`],
     ["Topology", `/projects/${projectId}/topology`],
     ["Events", `/projects/${projectId}/events`],
     ["Deployments", `/projects/${projectId}/deployments`]

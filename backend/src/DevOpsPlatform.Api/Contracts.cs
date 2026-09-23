@@ -2,7 +2,9 @@ using DevOpsPlatform.Domain;
 
 namespace DevOpsPlatform.Api;
 
-public sealed record CreateProject(string Name, string? Description);
+public sealed record CreateProject(string Name, string? Description, string? Slug = null, ProjectVisibility Visibility = ProjectVisibility.Private);
+public sealed record UpdateProject(string Name, string? Description, string Slug, ProjectVisibility Visibility);
+public sealed record AddProjectMember(Guid UserId, ProjectRole Role);
 public sealed record CreateEnvironment(string Name, EnvironmentType Type);
 public sealed record CreateComponent(string Name, string? Description, ComponentType Type, string? RepositoryUrl, string? Owner);
 public sealed record CreateDependency(Guid SourceComponentId, Guid TargetComponentId, DependencyType Type, DependencySource Source);

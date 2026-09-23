@@ -1,0 +1,21 @@
+# Authentication and project access
+
+Version 2 uses Keycloak as an external OpenID Connect provider. Auth.js handles authorization code with PKCE for the Next.js web app. It stores the provider access and refresh tokens inside an encrypted HttpOnly session cookie; browser code sees only the user session. A Next.js route handler forwards `/api/*` requests to the ASP.NET API with the access token, including the event stream. Its server-only Auth.js callback refreshes expired access tokens and never exposes them through the public session endpoint. The API validates JWT signature, issuer, audience (`devops-api`), and expiration using Keycloak discovery keys.
+
+The local `UserProfile` key is `(Issuer, ExternalSubject)`. Email and display name can change without changing ownership. Project membership is stored as `ProjectMember` with Owner, Contributor, or Viewer roles. A creator receives Owner membership. Viewers can read, Contributors can also change project operational data, and Owners can update/archive a project and add members. Every project-scoped API route, including component-only and development simulation routes, checks membership. A user's project list contains only their projects. Health endpoints and the development OpenAPI document remain public.
+
+The deterministic Commerce Demo has no hard-coded user identity. The first authenticated user to list projects claims it as Owner if it has no members. For non-demo projects imported from V1, an administrator must assign members through a controlled migration or the database; they are never silently given to an unrelated new identity. The `Private` and `Internal` values are stored now; both require explicit membership in this slice.
+
+## Local setup
+
+1. Copy `.env.example` to `.env` and replace `AUTH_SECRET` with a random secret of at least 32 bytes. Change local Keycloak admin credentials for shared environments.
+2. Run `docker compose up --build`. Open `http://keycloak.localhost:8080/admin/`, log into the master realm with the `.env` admin credentials, and create a user in the imported `devops` realm. Set a password in the user's Credentials tab.
+3. Open `http://localhost:3000/signin` and sign in. The imported `devops-web` client has the callback `http://localhost:3000/api/auth/callback/keycloak` and an audience mapper for `devops-api`.
+
+`keycloak.localhost` resolves to loopback in browsers and to the Keycloak service through a Compose network alias. If the local resolver does not map it to loopback, add a local hosts entry for `127.0.0.1 keycloak.localhost`. The Keycloak realm import is development-only and includes a throwaway local client secret; use separately managed clients and HTTPS issuer URLs outside local development.
+
+For separate processes, set `Oidc__Issuer=http://keycloak.localhost:8080/realms/devops` and `Oidc__Audience=devops-api` on the API. Set `AUTH_URL=http://localhost:3000`, `AUTH_SECRET`, `AUTH_KEYCLOAK_ID=devops-web`, `AUTH_KEYCLOAK_SECRET=devops-local-only`, `AUTH_KEYCLOAK_ISSUER=http://keycloak.localhost:8080/realms/devops`, and `API_INTERNAL_URL=http://localhost:5000` on Next.js. The API and web app must use the same issuer identity, and the web client must receive an access token with the `devops-api` audience.
+
+## Checks
+
+The backend integration tests use an isolated test authentication scheme to verify 401 for anonymous requests, cross-project 403, viewer read access, and role-based write denial. A Compose smoke test on 2026-09-23 verified Keycloak discovery, the PKCE redirect, browser sign-in, the authenticated project list, and the existing Commerce Demo overview. The additive `OidcOwnership` migration was applied to both fresh and V1-upgraded PostgreSQL databases.

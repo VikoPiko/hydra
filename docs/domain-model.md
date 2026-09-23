@@ -1,5 +1,9 @@
 # Domain model
 
+Version 2 projects have a unique URL-friendly slug, Private or Internal visibility, optional creator ID until identity is linked, and an optional archive timestamp. Archiving hides a project from the default list without deleting its environments, topology, deployments, or events. A newly created project has no seeded components; only the deterministic Commerce Demo seed supplies demo topology.
+
+WorkItem, Iteration, and WorkItemActivity extend the project model. WorkItem uses a GUID key and database-backed global sequence number. Its parent, assignee, and iteration are validated within the project; activity records describe creation, updates, state changes, and assignment changes.
+
 - **Project** owns environments, components, dependencies, deployments, runtime states, and events.
 - **SystemEnvironment** identifies an execution context (Development, Testing, Staging, Production, or Custom).
 - **SystemComponent** is one topology node. Types include Frontend, Service, Database, MessageBroker, Cache, ExternalService, Gateway, Worker, and Other.

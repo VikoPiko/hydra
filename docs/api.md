@@ -1,5 +1,9 @@
 # API overview
 
+Project management (Version 2 slice): `GET /api/projects` lists active projects; `?includeArchived=true` includes archived records. `GET /api/projects/{id}` returns a project. `POST /api/projects` accepts `name`, optional `description`, optional lowercase `slug`, and `visibility` (`Private` or `Internal`). If omitted, a slug is generated from the name. `PUT /api/projects/{id}` updates those fields. `POST /api/projects/{id}/archive` archives without deleting related data. Duplicate names or slugs return 409; invalid fields return 400. The `/projects/new` UI uses the same API.
+
+Work-item endpoints, filters, state and assignment rules are documented in [work-items.md](work-items.md). All `/api/*` endpoints require a validated OIDC bearer token; project-scoped routes also require membership.
+
 Development OpenAPI JSON is served at `/openapi/v1.json`. Responses use ordinary JSON DTOs; errors use Problem Details. All IDs are GUIDs and enum values are JSON strings.
 
 | Capability | Endpoints |

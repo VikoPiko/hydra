@@ -1,5 +1,7 @@
 # Architecture
 
+Version 2 adds an OIDC boundary: Auth.js in Next.js holds the Keycloak session and proxies authenticated `/api/*` calls. ASP.NET validates Keycloak access tokens, resolves local users by issuer and subject, and checks project membership on project-scoped routes. See `docs/authentication.md` and ADR 0006.
+
 One Git monorepo contains a Next.js frontend and an ASP.NET Core 10 backend. The backend is a modular monolith: Domain defines the model, Application contains impact traversal and the live event port, Infrastructure implements an in-memory event bus, Persistence implements EF Core/PostgreSQL, and API composes services and HTTP use cases. PostgreSQL is the source of truth. The topology query joins current components, dependencies, successful deployment versions, and runtime states into a UI DTO.
 
 ```mermaid

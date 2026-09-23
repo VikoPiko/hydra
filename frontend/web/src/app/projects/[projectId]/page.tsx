@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ProjectNav } from "@/components/ProjectNav";
-import { Deployment, Environment, getJson, OperationalEvent, Project, Topology } from "@/lib/api";
+import { Deployment, Environment, getJson, OperationalEvent, postJson, Project, Topology } from "@/lib/api";
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -15,6 +15,18 @@ export default function ProjectPage() {
   const [events, setEvents] = useState<OperationalEvent[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [error, setError] = useState("");
+  const [environmentName, setEnvironmentName] = useState("");
+  const [environmentType, setEnvironmentType] = useState("Development");
+  async function createEnvironment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const environment = await postJson<Environment>(`/api/projects/${projectId}/environments`, { name: environmentName, type: environmentType });
+      setEnvironments(current => [...current, environment]);
+      setEnvironmentId(environment.id);
+      setEnvironmentName("");
+      setError("");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to create environment."); }
+  }
   useEffect(() => {
     Promise.all([getJson<Project>(`/api/projects/${projectId}`), getJson<Environment[]>(`/api/projects/${projectId}/environments`)])
       .then(([p, envs]) => { setProject(p); setEnvironments(envs); setEnvironmentId(envs.find(e => e.type === "Production")?.id ?? envs[0]?.id ?? ""); })
@@ -34,8 +46,9 @@ export default function ProjectPage() {
     <Link href="/projects" className="back-link">← Projects</Link><div className="eyebrow">SYSTEM WORKSPACE</div>
     <h1>{project?.name ?? "Loading…"}</h1><p className="lede">{project?.description}</p>
     <ProjectNav projectId={projectId} active="Overview" />
+    {project && environments.length === 0 && <section className="panel"><h2>Add your first environment</h2><p className="muted">This project is empty. Add an environment to start tracking its topology and deployments.</p><form className="inline-form" onSubmit={createEnvironment}><label>Name<input required minLength={2} maxLength={120} value={environmentName} onChange={e => setEnvironmentName(e.target.value)} placeholder="e.g. Production" /></label><label>Type<select value={environmentType} onChange={e => setEnvironmentType(e.target.value)}>{["Development", "Testing", "Staging", "Production", "Custom"].map(type => <option key={type}>{type}</option>)}</select></label><button className="button primary">Add environment</button></form></section>}
     <div className="toolbar"><label>Environment <select value={environmentId} onChange={e => setEnvironmentId(e.target.value)}>{environments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
-      <Link className="button primary" href={`/projects/${projectId}/topology?environmentId=${environmentId}`}>Open topology →</Link></div>
+      {environmentId && <Link className="button primary" href={`/projects/${projectId}/topology?environmentId=${environmentId}`}>Open topology →</Link>}</div>
     {error && <p className="error">{error}</p>}
     <div className="stats"><div><strong>{topology?.nodes.length ?? "—"}</strong><span>Components</span></div><div><strong>{topology?.edges.length ?? "—"}</strong><span>Dependencies</span></div><div><strong>{attention}</strong><span>Need attention</span></div></div>
     <div className="two-col"><section className="panel"><h2>Recent events</h2>{events.map(e => <div className="list-row" key={e.id}><span className={`severity ${e.severity.toLowerCase()}`}>{e.severity}</span><div><strong>{e.title}</strong><small>{componentName(e.componentId)} · {new Date(e.occurredAt).toLocaleString()}</small></div></div>)}{events.length === 0 && <p className="muted">No events for this environment.</p>}</section>

@@ -19,7 +19,7 @@ public static class DemoSeed
             ComponentType.MessageBroker, ComponentType.ExternalService };
         var ids = Enumerable.Range(1, names.Length).Select(i => Guid.Parse($"30000000-0000-0000-0000-{i:000000000000}")).ToArray();
         var at = new DateTimeOffset(2026, 9, 22, 10, 0, 0, TimeSpan.Zero);
-        db.Projects.Add(new Project { Id = projectId, Name = "Commerce Demo", Description = "Distributed commerce system demo", CreatedAt = at, UpdatedAt = at });
+        db.Projects.Add(new Project { Id = projectId, Name = "Commerce Demo", Slug = "commerce-demo", Visibility = ProjectVisibility.Internal, Description = "Distributed commerce system demo", CreatedAt = at, UpdatedAt = at });
         db.Environments.AddRange(
             new SystemEnvironment { Id = developmentId, ProjectId = projectId, Name = "Development", Type = EnvironmentType.Development, CreatedAt = at, UpdatedAt = at },
             new SystemEnvironment { Id = productionId, ProjectId = projectId, Name = "Production", Type = EnvironmentType.Production, CreatedAt = at, UpdatedAt = at });

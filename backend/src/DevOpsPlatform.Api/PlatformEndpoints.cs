@@ -1,4 +1,5 @@
-using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Security.Claims;
 using DevOpsPlatform.Application;
 using DevOpsPlatform.Domain;
 using DevOpsPlatform.Persistence;
@@ -10,21 +11,104 @@ public static partial class PlatformEndpoints
 {
     public static void MapPlatformEndpoints(this WebApplication app)
     {
-        var api = app.MapGroup("/api");
-        api.MapGet("/projects", async (PlatformDbContext db, CancellationToken ct) =>
-            await db.Projects.AsNoTracking().OrderBy(x => x.Name).ToListAsync(ct));
+        var api = app.MapGroup("/api").RequireAuthorization();
+        api.AddEndpointFilter(async (context, next) =>
+        {
+            var http = context.HttpContext;
+            var projectId = Guid.TryParse(http.Request.RouteValues["projectId"]?.ToString(), out var routeId) ? routeId : Guid.Empty;
+            if (projectId == Guid.Empty && Guid.TryParse(http.Request.RouteValues["componentId"]?.ToString(), out var componentId))
+            {
+                var db = http.RequestServices.GetRequiredService<PlatformDbContext>();
+                projectId = await db.Components.AsNoTracking().Where(x => x.Id == componentId).Select(x => x.ProjectId).FirstOrDefaultAsync(http.RequestAborted);
+                if (projectId == Guid.Empty) return Results.NotFound();
+            }
+            if (projectId == Guid.Empty && Guid.TryParse(http.Request.RouteValues["workItemId"]?.ToString(), out var workItemId))
+            {
+                var db = http.RequestServices.GetRequiredService<PlatformDbContext>();
+                projectId = await db.WorkItems.AsNoTracking().Where(x => x.Id == workItemId).Select(x => x.ProjectId).FirstOrDefaultAsync(http.RequestAborted);
+                if (projectId == Guid.Empty) return Results.NotFound();
+            }
+            if (projectId != Guid.Empty)
+            {
+                var access = http.RequestServices.GetRequiredService<ProjectAccess>();
+                var user = await access.GetUserAsync(http.User, http.RequestAborted);
+                var path = http.Request.Path.Value ?? "";
+                var required = http.Request.Method == "GET" ? ProjectRole.Viewer : ProjectRole.Contributor;
+                if (path.EndsWith("/archive") || path.EndsWith("/members") ||
+                    (http.Request.Method == "PUT" && path.StartsWith("/api/projects/") && path.Count(c => c == '/') == 3))
+                    required = ProjectRole.Owner;
+                if (!ProjectAccess.Allows(await access.RoleAsync(projectId, user, http.RequestAborted), required))
+                    return Results.Forbid();
+            }
+            return await next(context);
+        });
+        api.MapGet("/me", async (ClaimsPrincipal principal, ProjectAccess access, CancellationToken ct) =>
+        {
+            var user = await access.GetUserAsync(principal, ct);
+            return Results.Ok(new { user.Id, user.DisplayName, user.Email });
+        });
+        api.MapGet("/projects", async (bool? includeArchived, ClaimsPrincipal principal, ProjectAccess access, PlatformDbContext db, CancellationToken ct) =>
+        {
+            var user = await access.GetUserAsync(principal, ct);
+            await access.ClaimDemoIfUnownedAsync(user, ct);
+            return await db.Projects.AsNoTracking().Where(x => (includeArchived == true || x.ArchivedAt == null) &&
+                    db.ProjectMembers.Any(m => m.ProjectId == x.Id && m.UserId == user.Id))
+                .OrderBy(x => x.Name).ToListAsync(ct);
+        });
         api.MapGet("/projects/{projectId:guid}", async (Guid projectId, PlatformDbContext db, CancellationToken ct) =>
             await db.Projects.AsNoTracking().FirstOrDefaultAsync(x => x.Id == projectId, ct) is { } project
                 ? Results.Ok(project) : Results.NotFound());
-        api.MapPost("/projects", async (CreateProject request, PlatformDbContext db, CancellationToken ct) =>
+        api.MapPost("/projects", async (CreateProject request, ClaimsPrincipal principal, ProjectAccess access, PlatformDbContext db, CancellationToken ct) =>
         {
             if (!ValidName(request.Name)) return Bad("Name must be 2–120 characters.");
             if (request.Description?.Length > 2000) return Bad("Description is too long.");
-            if (await db.Projects.AnyAsync(x => x.Name == request.Name.Trim(), ct)) return Conflict("Project name already exists.");
-            var project = new Project { Name = request.Name.Trim(), Description = request.Description?.Trim() ?? "" };
+            var slug = request.Slug is null ? Slugify(request.Name) : request.Slug.Trim();
+            if (!ValidSlug(slug) || !Enum.IsDefined(request.Visibility)) return Bad("Slug must use 2–80 lowercase letters, numbers, or hyphens, and visibility must be valid.");
+            if (await db.Projects.AnyAsync(x => x.Name == request.Name.Trim() || x.Slug == slug, ct)) return Conflict("Project name or slug already exists.");
+            var user = await access.GetUserAsync(principal, ct);
+            var project = new Project { Name = request.Name.Trim(), Description = request.Description?.Trim() ?? "", Slug = slug, Visibility = request.Visibility, CreatedByUserId = user.Id };
             db.Projects.Add(project);
+            db.ProjectMembers.Add(new ProjectMember { ProjectId = project.Id, UserId = user.Id, Role = ProjectRole.Owner });
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/projects/{project.Id}", project);
+        });
+        api.MapPut("/projects/{projectId:guid}", async (Guid projectId, UpdateProject request, PlatformDbContext db, CancellationToken ct) =>
+        {
+            var project = await db.Projects.FindAsync([projectId], ct);
+            if (project is null) return Results.NotFound();
+            if (!ValidName(request.Name) || request.Description?.Length > 2000 || !ValidSlug(request.Slug) || !Enum.IsDefined(request.Visibility))
+                return Bad("Invalid project fields.");
+            if (await db.Projects.AnyAsync(x => x.Id != projectId && (x.Name == request.Name.Trim() || x.Slug == request.Slug), ct))
+                return Conflict("Project name or slug already exists.");
+            project.Name = request.Name.Trim();
+            project.Description = request.Description?.Trim() ?? "";
+            project.Slug = request.Slug;
+            project.Visibility = request.Visibility;
+            project.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(project);
+        });
+        api.MapPost("/projects/{projectId:guid}/archive", async (Guid projectId, PlatformDbContext db, CancellationToken ct) =>
+        {
+            var project = await db.Projects.FindAsync([projectId], ct);
+            if (project is null) return Results.NotFound();
+            project.ArchivedAt ??= DateTimeOffset.UtcNow;
+            project.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(project);
+        });
+        api.MapGet("/projects/{projectId:guid}/members", async (Guid projectId, PlatformDbContext db, CancellationToken ct) =>
+            await db.ProjectMembers.AsNoTracking().Where(x => x.ProjectId == projectId)
+                .Join(db.Users, member => member.UserId, user => user.Id,
+                    (member, user) => new { member.UserId, user.DisplayName, user.Email, member.Role }).ToListAsync(ct));
+        api.MapPost("/projects/{projectId:guid}/members", async (Guid projectId, AddProjectMember request, PlatformDbContext db, CancellationToken ct) =>
+        {
+            if (!Enum.IsDefined(request.Role) || !await db.Users.AnyAsync(x => x.Id == request.UserId, ct)) return Bad("Invalid member.");
+            if (await db.ProjectMembers.AnyAsync(x => x.ProjectId == projectId && x.UserId == request.UserId, ct)) return Conflict("User is already a member.");
+            var member = new ProjectMember { ProjectId = projectId, UserId = request.UserId, Role = request.Role };
+            db.ProjectMembers.Add(member);
+            await db.SaveChangesAsync(ct);
+            return Results.Created($"/api/projects/{projectId}/members", member);
         });
 
         api.MapGet("/projects/{projectId:guid}/environments", async (Guid projectId, PlatformDbContext db, CancellationToken ct) =>
@@ -112,9 +196,12 @@ public static partial class PlatformEndpoints
         });
 
         MapLifecycleEndpoints(api, app.Environment.IsDevelopment());
+        MapWorkItemEndpoints(api);
     }
 
     private static bool ValidName(string? name) => name?.Trim().Length is >= 2 and <= 120;
+    private static bool ValidSlug(string? slug) => slug is { Length: >= 2 and <= 80 } && Regex.IsMatch(slug, "^[a-z0-9]+(?:-[a-z0-9]+)*$");
+    private static string Slugify(string name) => Regex.Replace(Regex.Replace(name.Trim().ToLowerInvariant(), "[^a-z0-9]+", "-"), "^-|-$", "") is { Length: >= 2 and <= 80 } slug ? slug : "project-" + Guid.NewGuid().ToString("N")[..8];
     private static IResult Bad(string detail) => Results.Problem(detail: detail, statusCode: 400);
     private static IResult Conflict(string detail) => Results.Problem(detail: detail, statusCode: 409);
     private static Task<bool> ValidEnvironment(PlatformDbContext db, Guid projectId, Guid environmentId, CancellationToken ct) =>
