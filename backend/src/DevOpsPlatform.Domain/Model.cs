@@ -134,6 +134,13 @@ public sealed class SystemComponent
     public ComponentType Type { get; set; }
     public string? RepositoryUrl { get; set; }
     public string? Owner { get; set; }
+    public ComponentOrigin Origin { get; set; } = ComponentOrigin.Manual;
+    public DiscoveryStatus DiscoveryStatus { get; set; } = DiscoveryStatus.Active;
+    public string? ExternalIdentifier { get; set; }
+    public Guid? RepositoryConnectionId { get; set; }
+    public DateTimeOffset? LastDiscoveredAt { get; set; }
+    public bool IsTypeOverridden { get; set; }
+    public bool IsNameOverridden { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

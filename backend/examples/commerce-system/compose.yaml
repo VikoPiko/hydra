@@ -1,0 +1,29 @@
+services:
+  web-frontend:
+    image: example/web-frontend:1.0
+    depends_on:
+      - api-gateway
+  api-gateway:
+    image: example/api-gateway:1.0
+    depends_on:
+      - order-service
+  order-service:
+    image: example/order-service:2.1
+    depends_on:
+      - payment-service
+      - orders-db
+      - rabbitmq
+  payment-service:
+    image: example/payment-service:1.4
+    depends_on:
+      - stripe-adapter
+  notification-worker:
+    image: example/notification-worker:1.0
+    depends_on:
+      - rabbitmq
+  orders-db:
+    image: postgres:17
+  rabbitmq:
+    image: rabbitmq:4
+  stripe-adapter:
+    image: example/stripe-adapter:1.0

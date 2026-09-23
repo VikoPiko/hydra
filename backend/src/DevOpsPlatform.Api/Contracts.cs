@@ -16,7 +16,11 @@ public sealed record UpdateRuntime(HealthStatus HealthStatus, double? CpuPercent
 public sealed record TopologyMetrics(double? CpuPercent, double? MemoryPercent, double? RequestRate,
     double? ErrorRatePercent, double? LatencyP95Ms);
 public sealed record TopologyNode(Guid Id, string Name, ComponentType Type, HealthStatus Health, string? Version,
-    string? Description, string? RepositoryUrl, string? Owner, TopologyMetrics Metrics);
-public sealed record TopologyEdge(Guid Id, Guid Source, Guid Target, DependencyType Type, DependencySource SourceKind);
+    string? Description, string? RepositoryUrl, string? Owner, TopologyMetrics Metrics,
+    ComponentOrigin Origin, DiscoveryStatus DiscoveryStatus, Guid? RepositoryConnectionId, DateTimeOffset? LastDiscoveredAt);
+public sealed record TopologyEvidence(DiscoveryEvidenceType Type, DependencySource SourceKind, string? SourcePath,
+    string? SourceLocation, string? Description, DateTimeOffset? ObservedAt, DateTimeOffset CreatedAt);
+public sealed record TopologyEdge(Guid Id, Guid Source, Guid Target, DependencyType Type, DependencySource SourceKind,
+    IReadOnlyList<TopologyEvidence> Evidence);
 public sealed record TopologyResponse(Guid ProjectId, Guid EnvironmentId, DateTimeOffset GeneratedAt,
     IReadOnlyList<TopologyNode> Nodes, IReadOnlyList<TopologyEdge> Edges);

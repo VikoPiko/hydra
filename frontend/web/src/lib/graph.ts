@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { Impact, Topology } from "./api";
 
-export function mapTopology(topology: Topology, selectedId: string | null, impact: Impact | null, search: string): { nodes: Node[]; edges: Edge[] } {
+export function mapTopology(topology: Topology, selectedId: string | null, impact: Impact | null, search: string, selectedEdgeId: string | null = null): { nodes: Node[]; edges: Edge[] } {
   const incoming = new Set(topology.edges.map(edge => edge.target));
   const roots = topology.nodes.filter(node => !incoming.has(node.id)).map(node => node.id);
   const depths = new Map<string, number>();
@@ -33,7 +33,7 @@ export function mapTopology(topology: Topology, selectedId: string | null, impac
   });
   const edges: Edge[] = topology.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target,
     label: `${edge.type} · ${edge.sourceKind}`, type: "smoothstep", animated: false,
-    style: { stroke: selectedId && (edge.source === selectedId || edge.target === selectedId) ? "var(--color-primary)" : "var(--color-border-strong)", strokeWidth: 1.5 },
+    style: { stroke: selectedEdgeId === edge.id || selectedId && (edge.source === selectedId || edge.target === selectedId) ? "var(--color-primary)" : "var(--color-border-strong)", strokeWidth: selectedEdgeId === edge.id ? 3 : 1.5 },
     labelStyle: { fill: "var(--color-text-secondary)", fontSize: 10 }, labelBgStyle: { fill: "var(--color-surface)", fillOpacity: 0.95 } }));
   return { nodes, edges };
 }

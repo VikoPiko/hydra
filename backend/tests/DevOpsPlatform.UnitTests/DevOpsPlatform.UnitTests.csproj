@@ -20,6 +20,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DevOpsPlatform.Application\DevOpsPlatform.Application.csproj" />
+    <ProjectReference Include="..\..\src\DevOpsPlatform.Infrastructure\DevOpsPlatform.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\Fixtures\Discovery\*.yml" Link="Fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

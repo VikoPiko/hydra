@@ -5,6 +5,8 @@ Version 2 projects have a unique URL-friendly slug, Private or Internal visibili
 WorkItem, Iteration, and WorkItemActivity extend the project model. WorkItem uses a GUID key and database-backed global sequence number. Its parent, assignee, and iteration are validated within the project; activity records describe creation, updates, state changes, and assignment changes.
 ProjectMember connects OIDC-backed UserProfile records to projects. Tags attach to work items through WorkItemTag. WorkItemComponentLink connects planning items to operational components within the same project; link changes are recorded in WorkItemActivity.
 
+V3 introduces RepositoryConnection, RepositoryScan, SynchronizationJob, and DependencyEvidence. A connection belongs to a project. A scan belongs to a connection and stores normalized preview candidates until accepted; a persisted job records background execution. Discovered components carry origin, status, a stable external identifier, connection, last-discovered time, and manual name/type override flags. Evidence belongs to an existing dependency and records its classification and source path/location. The V2 Source value remains on Dependency for compatible reads and is backfilled into evidence by the additive migration.
+
 - **Project** owns environments, components, dependencies, deployments, runtime states, and events.
 - **SystemEnvironment** identifies an execution context (Development, Testing, Staging, Production, or Custom).
 - **SystemComponent** is one topology node. Types include Frontend, Service, Database, MessageBroker, Cache, ExternalService, Gateway, Worker, and Other.
@@ -34,6 +36,11 @@ erDiagram
   Tag ||--o{ WorkItemTag : labels
   WorkItem ||--o{ WorkItemComponentLink : affects
   SystemComponent ||--o{ WorkItemComponentLink : linked
+  Project ||--o{ RepositoryConnection : connects
+  RepositoryConnection ||--o{ RepositoryScan : scans
+  RepositoryConnection ||--o{ SystemComponent : discovers
+  Project ||--o{ SynchronizationJob : processes
+  Dependency ||--o{ DependencyEvidence : explained_by
 ```
 
 Names are unique within a project for environments and components. A dependency may not self-reference or cross projects. `(SourceComponentId, TargetComponentId, Type)` and `(EnvironmentId, ComponentId)` for runtime state are unique. Timestamps use UTC `DateTimeOffset`.

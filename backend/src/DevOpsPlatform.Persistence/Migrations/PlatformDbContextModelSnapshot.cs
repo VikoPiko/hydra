@@ -65,6 +65,60 @@ namespace DevOpsPlatform.Persistence.Migrations
                     b.ToTable("Dependencies");
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.DependencyEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DependencyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RepositoryConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ScanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceKind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("SourceLocation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SourcePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RepositoryConnectionId");
+
+                    b.HasIndex("ScanId");
+
+                    b.HasIndex("DependencyId", "Type");
+
+                    b.ToTable("DependencyEvidence");
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.Deployment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -285,6 +339,131 @@ namespace DevOpsPlatform.Persistence.Migrations
                     b.ToTable("ProjectMembers");
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.RepositoryConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AuthenticationMode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DefaultBranch")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ExternalRepositoryId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("LastSuccessfulSyncAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastSyncAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastSyncError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("RepositoryUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "RepositoryUrl")
+                        .IsUnique();
+
+                    b.ToTable("RepositoryConnections");
+                });
+
+            modelBuilder.Entity("DevOpsPlatform.Domain.RepositoryScan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CommitSha")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ComponentsDiscovered")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DependenciesDiscovered")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("FilesScanned")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PreviewJson")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RepositoryConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<int>("WarningsCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RepositoryConnectionId", "StartedAt");
+
+                    b.ToTable("RepositoryScans");
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.RuntimeState", b =>
                 {
                     b.Property<Guid>("Id")
@@ -338,6 +517,65 @@ namespace DevOpsPlatform.Persistence.Migrations
                     b.ToTable("RuntimeStates");
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.SynchronizationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RepositoryConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ScanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RepositoryConnectionId");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("ScanId");
+
+                    b.HasIndex("ProjectId", "CreatedAt");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("SynchronizationJobs");
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.SystemComponent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -352,16 +590,42 @@ namespace DevOpsPlatform.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<string>("DiscoveryStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ExternalIdentifier")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsNameOverridden")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTypeOverridden")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastDiscoveredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Owner")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
                     b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RepositoryConnectionId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("RepositoryUrl")
@@ -380,6 +644,10 @@ namespace DevOpsPlatform.Persistence.Migrations
 
                     b.HasIndex("ProjectId", "Name")
                         .IsUnique();
+
+                    b.HasIndex("RepositoryConnectionId", "ExternalIdentifier")
+                        .IsUnique()
+                        .HasFilter("\"RepositoryConnectionId\" IS NOT NULL AND \"ExternalIdentifier\" IS NOT NULL");
 
                     b.ToTable("Components");
                 });
@@ -670,6 +938,25 @@ namespace DevOpsPlatform.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.DependencyEvidence", b =>
+                {
+                    b.HasOne("DevOpsPlatform.Domain.Dependency", null)
+                        .WithMany()
+                        .HasForeignKey("DependencyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DevOpsPlatform.Domain.RepositoryConnection", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryConnectionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DevOpsPlatform.Domain.RepositoryScan", null)
+                        .WithMany()
+                        .HasForeignKey("ScanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.Deployment", b =>
                 {
                     b.HasOne("DevOpsPlatform.Domain.SystemComponent", null)
@@ -742,6 +1029,24 @@ namespace DevOpsPlatform.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.RepositoryConnection", b =>
+                {
+                    b.HasOne("DevOpsPlatform.Domain.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DevOpsPlatform.Domain.RepositoryScan", b =>
+                {
+                    b.HasOne("DevOpsPlatform.Domain.RepositoryConnection", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.RuntimeState", b =>
                 {
                     b.HasOne("DevOpsPlatform.Domain.SystemComponent", null)
@@ -763,6 +1068,30 @@ namespace DevOpsPlatform.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DevOpsPlatform.Domain.SynchronizationJob", b =>
+                {
+                    b.HasOne("DevOpsPlatform.Domain.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DevOpsPlatform.Domain.RepositoryConnection", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryConnectionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DevOpsPlatform.Domain.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DevOpsPlatform.Domain.RepositoryScan", null)
+                        .WithMany()
+                        .HasForeignKey("ScanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("DevOpsPlatform.Domain.SystemComponent", b =>
                 {
                     b.HasOne("DevOpsPlatform.Domain.Project", null)
@@ -770,6 +1099,11 @@ namespace DevOpsPlatform.Persistence.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("DevOpsPlatform.Domain.RepositoryConnection", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryConnectionId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("DevOpsPlatform.Domain.SystemEnvironment", b =>

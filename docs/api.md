@@ -10,6 +10,8 @@ Operational integration: `GET /api/projects/{projectId}/work-item-component-link
 
 Topology comparison: `GET /api/projects/{projectId}/environments/{environmentId}/architecture-drift` reports project-wide dependency provenance. `GET /api/projects/{projectId}/environment-comparison?leftEnvironmentId={id}&rightEnvironmentId={id}` compares recorded versions and health. Both are explained in [topology-v2.md](topology-v2.md).
 
+V3 discovery: `POST /api/projects/import-demo` creates a private project, Production environment, bundled repository connection, and queued scan in one transaction. `GET /api/projects/{id}/repository-connections` lists safe connection metadata. Owners can create a bundled connection, request scans, apply completed previews, disconnect, and reconnect through `/api/projects/{id}/repository-connections/{connectionId}`. `GET .../scans?limit=25`, `GET .../scans/{scanId}`, and `GET .../scans/{scanId}/preview` expose persisted status, history, normalized candidates, warnings, and conflicts. `POST .../scans/{scanId}/apply` is idempotent. `PATCH /api/components/{componentId}/discovery-override` saves manual name/type corrections. The topology response includes component origin and an `evidence` array on each edge. See [discovery.md](discovery.md).
+
 Development OpenAPI JSON is served at `/openapi/v1.json`. Responses use ordinary JSON DTOs; errors use Problem Details. All IDs are GUIDs and enum values are JSON strings.
 
 | Capability | Endpoints |

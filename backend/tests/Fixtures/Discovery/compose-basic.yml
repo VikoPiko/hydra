@@ -1,0 +1,16 @@
+services:
+  web:
+    image: example/web:1
+  api:
+    build: ./api
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_started
+  db:
+    image: postgres:17
+  broker:
+    image: rabbitmq:4
+  cache:
+    image: redis:7

@@ -39,6 +39,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<ILiveEventBus, InMemoryLiveEventBus>();
+builder.Services.AddSingleton<IDiscoveryParser, DockerComposeDiscoveryParser>();
+builder.Services.AddSingleton<IRepositoryScanner>(provider => new BundledRepositoryScanner(
+    Path.Combine(AppContext.BaseDirectory, "examples", "commerce-system"), provider.GetServices<IDiscoveryParser>()));
+builder.Services.AddHostedService<RepositoryScanWorker>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(
     builder.Configuration["FrontendOrigin"] ?? "http://localhost:3000").AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres");

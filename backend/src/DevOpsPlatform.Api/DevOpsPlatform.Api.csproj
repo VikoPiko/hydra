@@ -17,4 +17,8 @@
     <ProjectReference Include="..\DevOpsPlatform.Infrastructure\DevOpsPlatform.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\examples\commerce-system\**\*" Link="examples\commerce-system\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

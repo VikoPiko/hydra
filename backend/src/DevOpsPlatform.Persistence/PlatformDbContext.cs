@@ -20,6 +20,10 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<Deployment> Deployments => Set<Deployment>();
     public DbSet<RuntimeState> RuntimeStates => Set<RuntimeState>();
     public DbSet<OperationalEvent> OperationalEvents => Set<OperationalEvent>();
+    public DbSet<RepositoryConnection> RepositoryConnections => Set<RepositoryConnection>();
+    public DbSet<RepositoryScan> RepositoryScans => Set<RepositoryScan>();
+    public DbSet<DependencyEvidence> DependencyEvidence => Set<DependencyEvidence>();
+    public DbSet<SynchronizationJob> SynchronizationJobs => Set<SynchronizationJob>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -131,8 +135,13 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             e.Property(x => x.RepositoryUrl).HasMaxLength(500);
             e.Property(x => x.Owner).HasMaxLength(120);
             e.Property(x => x.Type).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.Origin).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.DiscoveryStatus).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ExternalIdentifier).HasMaxLength(500);
+            e.HasOne<RepositoryConnection>().WithMany().HasForeignKey(x => x.RepositoryConnectionId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.ProjectId, x.Name }).IsUnique();
+            e.HasIndex(x => new { x.RepositoryConnectionId, x.ExternalIdentifier }).IsUnique().HasFilter("\"RepositoryConnectionId\" IS NOT NULL AND \"ExternalIdentifier\" IS NOT NULL");
         });
         model.Entity<Dependency>(e =>
         {
@@ -179,6 +188,57 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             e.HasOne<SystemComponent>().WithMany().HasForeignKey(x => x.ComponentId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => x.OccurredAt);
             e.HasIndex(x => new { x.EnvironmentId, x.OccurredAt });
+        });
+        model.Entity<RepositoryConnection>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Provider).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            e.Property(x => x.RepositoryUrl).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.DefaultBranch).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ExternalRepositoryId).HasMaxLength(300);
+            e.Property(x => x.AuthenticationMode).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.LastSyncError).HasMaxLength(1000);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ProjectId, x.RepositoryUrl }).IsUnique();
+        });
+        model.Entity<RepositoryScan>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CommitSha).HasMaxLength(120);
+            e.Property(x => x.Branch).HasMaxLength(200);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            e.HasOne<RepositoryConnection>().WithMany().HasForeignKey(x => x.RepositoryConnectionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.RepositoryConnectionId, x.StartedAt });
+        });
+        model.Entity<DependencyEvidence>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.SourceKind).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.SourcePath).HasMaxLength(500);
+            e.Property(x => x.SourceLocation).HasMaxLength(500);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.HasOne<Dependency>().WithMany().HasForeignKey(x => x.DependencyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<RepositoryConnection>().WithMany().HasForeignKey(x => x.RepositoryConnectionId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<RepositoryScan>().WithMany().HasForeignKey(x => x.ScanId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.DependencyId, x.Type });
+            e.HasIndex(x => x.ScanId);
+        });
+        model.Entity<SynchronizationJob>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
+            e.Property(x => x.LastError).HasMaxLength(1000);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<RepositoryConnection>().WithMany().HasForeignKey(x => x.RepositoryConnectionId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<RepositoryScan>().WithMany().HasForeignKey(x => x.ScanId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<UserProfile>().WithMany().HasForeignKey(x => x.RequestedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.Status, x.CreatedAt });
+            e.HasIndex(x => new { x.ProjectId, x.CreatedAt });
         });
     }
 }

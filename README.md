@@ -1,5 +1,7 @@
 # DevOpsPlatform
 
+Version 3 is being implemented in vertical slices from `AGENTS_V3.md`. The first slice adds persisted read-only repository scans, Docker Compose discovery, preview and apply, reconciliation, dependency evidence, and edge inspection. Open `/projects/import` to try the bundled Commerce System source; see [docs/discovery.md](docs/discovery.md), [docs/security.md](docs/security.md), and [docs/demo.md](docs/demo.md). Remote Git and Azure DevOps connections are not enabled yet. Board tickets can be dragged between state columns, with the Move menu retained for keyboard use.
+
 Version 2 implementation follows [AGENTS_V2.md](AGENTS_V2.md). The incremental slices cover the visual palette, persisted projects, OIDC authentication and ownership, work items, the board, operational links, topology comparisons, and project administration. The light visual tokens are documented in [docs/design-system.md](docs/design-system.md). Existing Version 1 operational features remain available.
 
 Projects can now be created at `/projects/new`. They persist in PostgreSQL, start empty, and can be updated or archived through the API. The additive `ProjectPersistence` migration backfills unique slugs for existing Version 1 projects and keeps the Commerce Demo ID and slug stable. See [docs/api.md](docs/api.md) for the project endpoints.
@@ -95,4 +97,4 @@ npm run build
 
 ## Scope
 
-This is an architectural baseline, not a CI runner, Kubernetes control plane, general telemetry store, or root-cause engine. Dependencies are declared through the API and seed data; current runtime state is submitted through the ingestion endpoint. Impact results express potential effect, not guaranteed failure or causation.
+This is an architectural baseline, not a CI runner, Kubernetes control plane, general telemetry store, or root-cause engine. Dependencies come from manual entries, seed data, or the currently supported Compose discovery source; current runtime state is submitted through the ingestion endpoint. Impact results express potential effect, not guaranteed failure or causation.

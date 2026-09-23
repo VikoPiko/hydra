@@ -20,6 +20,62 @@ namespace DevOpsPlatform.IntegrationTests;
 public class ApiTests
 {
     [Fact]
+    public async Task DemoRepositoryScanCanBeReviewedAppliedAndRescannedWithoutDuplicates()
+    {
+        await using var factory = new TestFactory();
+        using var alice = factory.CreateAuthenticatedClient();
+        using var bob = factory.CreateAuthenticatedClient("bob");
+        var started = await Post(alice, "/api/projects/import-demo", new { name = "Imported Commerce", description = "Scan test", visibility = "Private" });
+        var projectId = started.GetProperty("projectId").GetGuid();
+        var environmentId = started.GetProperty("environmentId").GetGuid();
+        var connectionId = started.GetProperty("connectionId").GetGuid();
+        var scanId = started.GetProperty("scanId").GetGuid();
+        var basePath = $"/api/projects/{projectId}/repository-connections/{connectionId}";
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.PostAsync($"{basePath}/scans", null)).StatusCode);
+        await WaitForScan(alice, $"{basePath}/scans/{scanId}");
+        var preview = await alice.GetFromJsonAsync<JsonElement>($"{basePath}/scans/{scanId}/preview");
+        Assert.Equal(8, preview.GetProperty("components").GetArrayLength());
+        Assert.Equal(7, preview.GetProperty("dependencies").GetArrayLength());
+        Assert.Empty(preview.GetProperty("warnings").EnumerateArray());
+        await Post(alice, $"{basePath}/scans/{scanId}/apply", new { });
+        var topology = await alice.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/environments/{environmentId}/topology");
+        Assert.Equal(8, topology.GetProperty("nodes").GetArrayLength());
+        Assert.Equal(7, topology.GetProperty("edges").GetArrayLength());
+        Assert.All(topology.GetProperty("edges").EnumerateArray(), edge =>
+            Assert.Equal("DockerCompose", edge.GetProperty("evidence")[0].GetProperty("type").GetString()));
+
+        var payment = Assert.Single(topology.GetProperty("nodes").EnumerateArray(), node =>
+            node.GetProperty("name").GetString() == "Payment Service");
+        var overrideResponse = await alice.PatchAsJsonAsync($"/api/components/{payment.GetProperty("id").GetGuid()}/discovery-override",
+            new { name = "Payment Service", type = "Gateway" });
+        Assert.Equal(HttpStatusCode.OK, overrideResponse.StatusCode);
+        var second = await Post(alice, $"{basePath}/scans", new { });
+        var secondScanId = second.GetProperty("id").GetGuid();
+        await WaitForScan(alice, $"{basePath}/scans/{secondScanId}");
+        await Post(alice, $"{basePath}/scans/{secondScanId}/apply", new { });
+        var repeated = await alice.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/environments/{environmentId}/topology");
+        Assert.Equal(8, repeated.GetProperty("nodes").GetArrayLength());
+        Assert.Equal(7, repeated.GetProperty("edges").GetArrayLength());
+        Assert.Equal("Gateway", Assert.Single(repeated.GetProperty("nodes").EnumerateArray(), node =>
+            node.GetProperty("name").GetString() == "Payment Service").GetProperty("type").GetString());
+        Assert.All(repeated.GetProperty("edges").EnumerateArray(), edge => Assert.Single(edge.GetProperty("evidence").EnumerateArray()));
+    }
+
+    private static async Task WaitForScan(HttpClient client, string path)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        while (!timeout.IsCancellationRequested)
+        {
+            var scan = await client.GetFromJsonAsync<JsonElement>(path, timeout.Token);
+            var status = scan.GetProperty("status").GetString();
+            if (status is "Succeeded" or "PartiallySucceeded") return;
+            if (status == "Failed") throw new Xunit.Sdk.XunitException($"Repository scan failed: {scan.GetProperty("errorMessage").GetString()}");
+            await Task.Delay(200, timeout.Token);
+        }
+        throw new Xunit.Sdk.XunitException("Repository scan did not complete in time.");
+    }
+
+    [Fact]
     public async Task CommerceDemoSeedAddsWorkOnceWithoutRestoringRemovedLinks()
     {
         await using var factory = new TestFactory();

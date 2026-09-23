@@ -1,11 +1,12 @@
 export type Health = "Healthy" | "Degraded" | "Unhealthy" | "Unknown";
 export type Project = { id: string; name: string; description: string; slug: string; visibility: "Private" | "Internal"; archivedAt: string | null };
 export type Environment = { id: string; projectId: string; name: string; type: string };
-export type Component = { id: string; projectId: string; name: string; description: string; type: string; repositoryUrl: string | null; owner: string | null };
+export type Component = { id: string; projectId: string; name: string; description: string; type: string; repositoryUrl: string | null; owner: string | null; origin: string; discoveryStatus: string; externalIdentifier: string | null; lastDiscoveredAt: string | null; isNameOverridden: boolean; isTypeOverridden: boolean };
 export type Dependency = { id: string; sourceComponentId: string; targetComponentId: string; type: string; source: "Declared" | "Discovered" | "Observed"; lastObservedAt: string | null };
 export type Metrics = { cpuPercent: number | null; memoryPercent: number | null; requestRate: number | null; errorRatePercent: number | null; latencyP95Ms: number | null };
-export type TopologyNode = { id: string; name: string; type: string; health: Health; version: string | null; description: string | null; repositoryUrl: string | null; owner: string | null; metrics: Metrics };
-export type TopologyEdge = { id: string; source: string; target: string; type: string; sourceKind: string };
+export type TopologyNode = { id: string; name: string; type: string; health: Health; version: string | null; description: string | null; repositoryUrl: string | null; owner: string | null; metrics: Metrics; origin: string; discoveryStatus: string; repositoryConnectionId: string | null; lastDiscoveredAt: string | null };
+export type TopologyEvidence = { type: string; sourceKind: string; sourcePath: string | null; sourceLocation: string | null; description: string | null; observedAt: string | null; createdAt: string };
+export type TopologyEdge = { id: string; source: string; target: string; type: string; sourceKind: string; evidence: TopologyEvidence[] };
 export type Topology = { projectId: string; environmentId: string; generatedAt: string; nodes: TopologyNode[]; edges: TopologyEdge[] };
 export type RuntimeState = { componentId: string; healthStatus: Health; cpuPercent: number | null; memoryPercent: number | null; requestRate: number | null; errorRatePercent: number | null; latencyP95Ms: number | null };
 export type OperationalEvent = { id: string; componentId: string | null; type: string; severity: string; title: string; description: string | null; occurredAt: string };
@@ -27,6 +28,12 @@ export type DriftEdge = { sourceComponentId: string; sourceName: string; targetC
 export type Drift = { scope: "Project"; matching: DriftEdge[]; declaredOnly: DriftEdge[]; observedOnly: DriftEdge[]; discovered: DriftEdge[] };
 export type ComponentComparison = { componentId: string; name: string; leftHasData: boolean; rightHasData: boolean; leftVersion: string | null; rightVersion: string | null; leftHealth: Health | null; rightHealth: Health | null; different: boolean };
 export type EnvironmentComparison = { leftEnvironmentId: string; leftEnvironmentName: string; rightEnvironmentId: string; rightEnvironmentName: string; componentPresenceMeaning: string; dependencyScope: "Project"; declaredDependencyCount: number; components: ComponentComparison[] };
+export type RepositoryConnection = { id: string; projectId: string; provider: string; name: string; repositoryUrl: string; defaultBranch: string; status: string; lastSuccessfulSyncAt: string | null; lastSyncAttemptAt: string | null; lastSyncError: string | null };
+export type RepositoryScan = { id: string; repositoryConnectionId: string; status: "Pending" | "Running" | "Succeeded" | "PartiallySucceeded" | "Failed"; startedAt: string; completedAt: string | null; filesScanned: number; componentsDiscovered: number; dependenciesDiscovered: number; warningsCount: number; errorMessage: string | null; appliedAt: string | null };
+export type DiscoveredComponent = { externalKey: string; name: string; type: string; sourcePath: string; sourceLocation: string };
+export type DiscoveredDependency = { sourceExternalKey: string; targetExternalKey: string; type: string; sourcePath: string; sourceLocation: string; description: string };
+export type DiscoveryPreview = { id: string; status: string; appliedAt: string | null; components: DiscoveredComponent[]; dependencies: DiscoveredDependency[]; warnings: { sourcePath: string; message: string }[]; newComponents: DiscoveredComponent[]; changedComponents: DiscoveredComponent[]; missingComponents: { id: string; name: string; externalIdentifier: string }[]; conflicts: DiscoveredComponent[] };
+export type ImportStart = { projectId: string; environmentId: string; connectionId: string; scanId: string; jobId: string };
 
 export const apiBase = "";
 

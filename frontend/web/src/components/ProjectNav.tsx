@@ -10,6 +10,7 @@ export function ProjectNav({ projectId, active }: { projectId: string; active: s
     ["Compare", `/projects/${projectId}/comparison`],
     ["Events", `/projects/${projectId}/events`],
     ["Deployments", `/projects/${projectId}/deployments`],
+    ["Integrations", `/projects/${projectId}/settings/integrations`],
     ["Settings", `/projects/${projectId}/settings`]
   ];
   return <nav className="project-nav" aria-label="Project pages">{items.map(([label, href]) =>

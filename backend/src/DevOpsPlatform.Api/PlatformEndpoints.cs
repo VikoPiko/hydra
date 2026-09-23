@@ -36,6 +36,7 @@ public static partial class PlatformEndpoints
                 var required = http.Request.Method == "GET" ? ProjectRole.Viewer : ProjectRole.Contributor;
                 if (path.EndsWith("/archive") ||
                     (http.Request.Method != "GET" && path.Contains("/members", StringComparison.Ordinal)) ||
+                    (http.Request.Method != "GET" && path.Contains("/repository-connections", StringComparison.Ordinal)) ||
                     (http.Request.Method == "PUT" && path.StartsWith("/api/projects/") && path.Count(c => c == '/') == 3))
                     required = ProjectRole.Owner;
                 if (!ProjectAccess.Allows(await access.RoleAsync(projectId, user, http.RequestAborted), required))
@@ -182,6 +183,13 @@ public static partial class PlatformEndpoints
                 TargetComponentId = request.TargetComponentId, Type = request.Type, Source = request.Source,
                 LastObservedAt = request.Source == DependencySource.Observed ? DateTimeOffset.UtcNow : null };
             db.Dependencies.Add(dependency);
+            db.DependencyEvidence.Add(new DependencyEvidence { DependencyId = dependency.Id,
+                SourceKind = request.Source, Type = request.Source switch
+                {
+                    DependencySource.Declared => DiscoveryEvidenceType.Manual,
+                    DependencySource.Observed => DiscoveryEvidenceType.RuntimeObservation,
+                    _ => DiscoveryEvidenceType.Other
+                }, ObservedAt = dependency.LastObservedAt });
             db.OperationalEvents.Add(new OperationalEvent { ProjectId = projectId, ComponentId = request.SourceComponentId,
                 Type = OperationalEventType.DependencyCreated, Severity = EventSeverity.Info, Title = "Dependency registered" });
             await db.SaveChangesAsync(ct);
@@ -193,6 +201,11 @@ public static partial class PlatformEndpoints
             if (!await ValidEnvironment(db, projectId, environmentId, ct)) return Results.NotFound();
             var components = await db.Components.AsNoTracking().Where(x => x.ProjectId == projectId).OrderBy(x => x.Name).ToListAsync(ct);
             var dependencies = await db.Dependencies.AsNoTracking().Where(x => x.ProjectId == projectId).ToListAsync(ct);
+            var dependencyIds = dependencies.Select(x => x.Id).ToArray();
+            var evidence = await db.DependencyEvidence.AsNoTracking().Where(x => dependencyIds.Contains(x.DependencyId))
+                .OrderBy(x => x.CreatedAt).ToListAsync(ct);
+            var evidenceByEdge = evidence.GroupBy(x => x.DependencyId).ToDictionary(x => x.Key, x => x.Select(e =>
+                new TopologyEvidence(e.Type, e.SourceKind, e.SourcePath, e.SourceLocation, e.Description, e.ObservedAt, e.CreatedAt)).ToArray());
             var states = await db.RuntimeStates.AsNoTracking().Where(x => x.EnvironmentId == environmentId).ToDictionaryAsync(x => x.ComponentId, ct);
             var deployments = await db.Deployments.AsNoTracking().Where(x => x.EnvironmentId == environmentId && x.Status == DeploymentStatus.Succeeded)
                 .OrderByDescending(x => x.CompletedAt).ToListAsync(ct);
@@ -203,10 +216,12 @@ public static partial class PlatformEndpoints
                 versions.TryGetValue(x.Id, out var version);
                 return new TopologyNode(x.Id, x.Name, x.Type, state?.HealthStatus ?? HealthStatus.Unknown, version,
                     x.Description, x.RepositoryUrl, x.Owner, new TopologyMetrics(state?.CpuPercent, state?.MemoryPercent,
-                        state?.RequestRate, state?.ErrorRatePercent, state?.LatencyP95Ms));
+                        state?.RequestRate, state?.ErrorRatePercent, state?.LatencyP95Ms),
+                    x.Origin, x.DiscoveryStatus, x.RepositoryConnectionId, x.LastDiscoveredAt);
             }).ToArray();
             return Results.Ok(new TopologyResponse(projectId, environmentId, DateTimeOffset.UtcNow, nodes,
-                dependencies.Select(x => new TopologyEdge(x.Id, x.SourceComponentId, x.TargetComponentId, x.Type, x.Source)).ToArray()));
+                dependencies.Select(x => new TopologyEdge(x.Id, x.SourceComponentId, x.TargetComponentId, x.Type, x.Source,
+                    evidenceByEdge.GetValueOrDefault(x.Id) ?? [])).ToArray()));
         });
         api.MapGet("/projects/{projectId:guid}/components/{componentId:guid}/impact", async (Guid projectId, Guid componentId, PlatformDbContext db, CancellationToken ct) =>
         {
@@ -220,6 +235,7 @@ public static partial class PlatformEndpoints
         MapWorkItemEndpoints(api);
         MapOperationalIntegrationEndpoints(api);
         MapTopologyComparisonEndpoints(api);
+        MapRepositoryDiscoveryEndpoints(api);
     }
 
     private static bool ValidName(string? name) => name?.Trim().Length is >= 2 and <= 120;
