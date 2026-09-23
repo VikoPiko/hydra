@@ -2,9 +2,13 @@
 
 Version 2 uses Keycloak as an external OpenID Connect provider. Auth.js handles authorization code with PKCE for the Next.js web app. It stores the provider access and refresh tokens inside an encrypted HttpOnly session cookie; browser code sees only the user session. A Next.js route handler forwards `/api/*` requests to the ASP.NET API with the access token, including the event stream. Its server-only Auth.js callback refreshes expired access tokens and never exposes them through the public session endpoint. The API validates JWT signature, issuer, audience (`devops-api`), and expiration using Keycloak discovery keys.
 
+If Keycloak rejects a refresh token, protected pages redirect to sign-in and browser API calls do the same on 401. The session callback never publishes the access token to the public session endpoint.
+
 The local `UserProfile` key is `(Issuer, ExternalSubject)`. Email and display name can change without changing ownership. Project membership is stored as `ProjectMember` with Owner, Contributor, or Viewer roles. A creator receives Owner membership. Viewers can read, Contributors can also change project operational data, and Owners can update/archive a project and add members. Every project-scoped API route, including component-only and development simulation routes, checks membership. A user's project list contains only their projects. Health endpoints and the development OpenAPI document remain public.
 
 The deterministic Commerce Demo has no hard-coded user identity. The first authenticated user to list projects claims it as Owner if it has no members. For non-demo projects imported from V1, an administrator must assign members through a controlled migration or the database; they are never silently given to an unrelated new identity. The `Private` and `Internal` values are stored now; both require explicit membership in this slice.
+
+An Owner can add someone who has already signed in using the Settings page and their email address. The API resolves the email only within the Owner's issuer and rejects ambiguous matches. Contributors and Viewers can read the member list, but only Owners can add members. The deterministic demo work actor has no project membership or sign-in capability.
 
 ## Local setup
 

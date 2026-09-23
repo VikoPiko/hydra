@@ -6,11 +6,13 @@ One Git monorepo contains a Next.js frontend and an ASP.NET Core 10 backend. The
 
 ```mermaid
 flowchart LR
-  User[Developer or operator] --> Web[Next.js UI / React Flow]
-  Web -->|REST| Api[ASP.NET Core API]
+  User[Developer or operator] --> Web[Next.js UI / Auth.js BFF / React Flow]
+  Web -->|OIDC code + PKCE| IdP[Keycloak in development]
+  Web -->|Bearer token, REST and SSE proxy| Api[ASP.NET Core API]
   Api -->|EF Core| Db[(PostgreSQL)]
   Api -->|publish| Bus[In-memory SSE bus]
-  Bus -->|SSE| Web
+  Bus -->|updates| Api
+  Api -->|SSE through BFF| Web
   Agent[Demo telemetry client] -->|Runtime PUT| Api
 ```
 
@@ -18,4 +20,4 @@ Edges point from a dependent to the component it needs. The impact engine traver
 
 SSE is scoped to a project and environment. It is in-memory, so multiple API instances would require a shared transport and replay or refetch strategy. The browser refetches on initial SSE connection; while disconnected the UI still supports manual refresh. The telemetry boundary is the runtime update API; no external telemetry provider is connected yet.
 
-The monolith keeps the five-person team's integration and local development simple while preserving clear boundaries for future source-control, deployment, and telemetry adapters.
+The monolith keeps solo development and local integration simple while preserving clear boundaries for future source-control, deployment, and telemetry adapters. Work-item/component links and the merged project activity query connect planning records to the operational model without moving either into a new service. Dependency provenance and environment comparison are read queries over the same PostgreSQL model.

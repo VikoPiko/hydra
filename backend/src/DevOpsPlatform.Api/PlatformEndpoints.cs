@@ -34,7 +34,8 @@ public static partial class PlatformEndpoints
                 var user = await access.GetUserAsync(http.User, http.RequestAborted);
                 var path = http.Request.Path.Value ?? "";
                 var required = http.Request.Method == "GET" ? ProjectRole.Viewer : ProjectRole.Contributor;
-                if (path.EndsWith("/archive") || path.EndsWith("/members") ||
+                if (path.EndsWith("/archive") ||
+                    (http.Request.Method != "GET" && path.Contains("/members", StringComparison.Ordinal)) ||
                     (http.Request.Method == "PUT" && path.StartsWith("/api/projects/") && path.Count(c => c == '/') == 3))
                     required = ProjectRole.Owner;
                 if (!ProjectAccess.Allows(await access.RoleAsync(projectId, user, http.RequestAborted), required))
@@ -106,6 +107,24 @@ public static partial class PlatformEndpoints
             if (!Enum.IsDefined(request.Role) || !await db.Users.AnyAsync(x => x.Id == request.UserId, ct)) return Bad("Invalid member.");
             if (await db.ProjectMembers.AnyAsync(x => x.ProjectId == projectId && x.UserId == request.UserId, ct)) return Conflict("User is already a member.");
             var member = new ProjectMember { ProjectId = projectId, UserId = request.UserId, Role = request.Role };
+            db.ProjectMembers.Add(member);
+            await db.SaveChangesAsync(ct);
+            return Results.Created($"/api/projects/{projectId}/members", member);
+        });
+        api.MapPost("/projects/{projectId:guid}/members/by-email", async (Guid projectId, AddProjectMemberByEmail request,
+            ClaimsPrincipal principal, ProjectAccess access, PlatformDbContext db, CancellationToken ct) =>
+        {
+            if (!Enum.IsDefined(request.Role) || request.Email?.Trim().Length is not (>= 3 and <= 320) ||
+                !request.Email.Contains('@')) return Bad("Invalid member email or role.");
+            var owner = await access.GetUserAsync(principal, ct);
+            var matches = await db.Users.Where(x => x.Issuer == owner.Issuer && x.Email == request.Email.Trim())
+                .Take(2).ToListAsync(ct);
+            if (matches.Count == 0) return Results.Problem("No signed-in user has that email for this identity provider.", statusCode: 404);
+            if (matches.Count > 1) return Conflict("Email matches more than one signed-in user.");
+            var user = matches[0];
+            if (await db.ProjectMembers.AnyAsync(x => x.ProjectId == projectId && x.UserId == user.Id, ct))
+                return Conflict("User is already a member.");
+            var member = new ProjectMember { ProjectId = projectId, UserId = user.Id, Role = request.Role };
             db.ProjectMembers.Add(member);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/projects/{projectId}/members", member);

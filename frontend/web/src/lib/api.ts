@@ -2,6 +2,7 @@ export type Health = "Healthy" | "Degraded" | "Unhealthy" | "Unknown";
 export type Project = { id: string; name: string; description: string; slug: string; visibility: "Private" | "Internal"; archivedAt: string | null };
 export type Environment = { id: string; projectId: string; name: string; type: string };
 export type Component = { id: string; projectId: string; name: string; description: string; type: string; repositoryUrl: string | null; owner: string | null };
+export type Dependency = { id: string; sourceComponentId: string; targetComponentId: string; type: string; source: "Declared" | "Discovered" | "Observed"; lastObservedAt: string | null };
 export type Metrics = { cpuPercent: number | null; memoryPercent: number | null; requestRate: number | null; errorRatePercent: number | null; latencyP95Ms: number | null };
 export type TopologyNode = { id: string; name: string; type: string; health: Health; version: string | null; description: string | null; repositoryUrl: string | null; owner: string | null; metrics: Metrics };
 export type TopologyEdge = { id: string; source: string; target: string; type: string; sourceKind: string };
@@ -31,6 +32,7 @@ export const apiBase = "";
 
 export async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { cache: "no-store" });
+  if (response.status === 401 && typeof window !== "undefined") window.location.assign("/signin");
   if (!response.ok) {
     const problem = await response.json().catch(() => null) as { detail?: string } | null;
     throw new Error(problem?.detail ?? `API request failed (${response.status})`);
@@ -40,6 +42,7 @@ export async function getJson<T>(path: string): Promise<T> {
 
 export async function postJson<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  if (response.status === 401 && typeof window !== "undefined") window.location.assign("/signin");
   if (!response.ok) {
     const problem = await response.json().catch(() => null) as { detail?: string } | null;
     throw new Error(problem?.detail ?? `API request failed (${response.status})`);
@@ -49,6 +52,7 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
 
 export async function sendJson<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { method, headers: body === undefined ? undefined : { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (response.status === 401 && typeof window !== "undefined") window.location.assign("/signin");
   if (!response.ok) {
     const problem = await response.json().catch(() => null) as { detail?: string } | null;
     throw new Error(problem?.detail ?? `API request failed (${response.status})`);

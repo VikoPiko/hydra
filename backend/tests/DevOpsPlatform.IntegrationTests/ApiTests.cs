@@ -13,11 +13,55 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using DevOpsPlatform.Persistence;
+using DevOpsPlatform.Api;
 
 namespace DevOpsPlatform.IntegrationTests;
 
 public class ApiTests
 {
+    [Fact]
+    public async Task CommerceDemoSeedAddsWorkOnceWithoutRestoringRemovedLinks()
+    {
+        await using var factory = new TestFactory();
+        using var client = factory.CreateAuthenticatedClient();
+        await client.GetAsync("/api/me");
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            await DemoSeed.SeedAsync(db);
+            await DemoSeed.SeedAsync(db);
+        }
+        var projectId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+        var bugId = Guid.Parse("50000000-0000-0000-0000-000000000004");
+        var paymentId = Guid.Parse("30000000-0000-0000-0000-000000000004");
+        await client.GetAsync("/api/projects");
+        var work = await client.GetFromJsonAsync<JsonElement[]>($"/api/projects/{projectId}/work-items");
+        Assert.Equal(4, work!.Length);
+        Assert.Single((await client.GetFromJsonAsync<JsonElement[]>($"/api/components/{paymentId}/work-items"))!);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/work-items/{bugId}/components/{paymentId}")).StatusCode);
+        await using (var scope = factory.Services.CreateAsyncScope())
+            await DemoSeed.SeedAsync(scope.ServiceProvider.GetRequiredService<PlatformDbContext>());
+        Assert.Empty((await client.GetFromJsonAsync<JsonElement[]>($"/api/components/{paymentId}/work-items"))!);
+    }
+
+    [Fact]
+    public async Task OwnerCanAddSignedInMemberByEmailAndContributorCannotManageMembers()
+    {
+        await using var factory = new TestFactory();
+        using var alice = factory.CreateAuthenticatedClient("alice");
+        using var bob = factory.CreateAuthenticatedClient("bob");
+        var project = await Post(alice, "/api/projects", new { name = "Member Settings" });
+        var projectId = project.GetProperty("id").GetGuid();
+        await bob.GetAsync("/api/me");
+        var added = await Post(alice, $"/api/projects/{projectId}/members/by-email",
+            new { email = "bob@example.test", role = "Contributor" });
+        Assert.Equal("Contributor", added.GetProperty("role").GetString());
+        Assert.Equal(HttpStatusCode.Created, (await bob.PostAsJsonAsync($"/api/projects/{projectId}/components",
+            new { name = "Worker", type = "Worker" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.PostAsJsonAsync($"/api/projects/{projectId}/members/by-email",
+            new { email = "alice@example.test", role = "Owner" })).StatusCode);
+    }
+
     [Fact]
     public async Task DriftAndEnvironmentComparisonUseRecordedProvenanceAndState()
     {
@@ -171,6 +215,7 @@ public class ApiTests
         var bobId = (await bob.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("id").GetGuid();
         await Post(alice, $"/api/projects/{projectId}/members", new { userId = bobId, role = "Viewer" });
         Assert.Equal(HttpStatusCode.OK, (await bob.GetAsync($"/api/projects/{projectId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await bob.GetAsync($"/api/projects/{projectId}/members")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await bob.PostAsJsonAsync($"/api/projects/{projectId}/environments", new { name = "Production", type = "Production" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await bob.PostAsync($"/api/projects/{projectId}/archive", null)).StatusCode);
     }
@@ -337,7 +382,8 @@ public class ApiTests
         {
             if (!Request.Headers.TryGetValue("X-Test-Subject", out var subject) || string.IsNullOrWhiteSpace(subject))
                 return Task.FromResult(AuthenticateResult.NoResult());
-            var claims = new[] { new Claim("iss", "test-issuer"), new Claim("sub", subject.ToString()), new Claim("name", subject.ToString()) };
+            var claims = new[] { new Claim("iss", "test-issuer"), new Claim("sub", subject.ToString()),
+                new Claim("name", subject.ToString()), new Claim("email", $"{subject}@example.test") };
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme.Name)), Scheme.Name)));
         }
     }

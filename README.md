@@ -1,6 +1,6 @@
 # DevOpsPlatform
 
-Version 2 implementation follows [AGENTS_V2.md](AGENTS_V2.md). The first five vertical slices cover the visual palette, persisted projects, OIDC authentication and ownership, work items, and the board. Later Version 2 features remain planned. The light visual tokens are documented in [docs/design-system.md](docs/design-system.md). Existing Version 1 operational features remain available during the transition.
+Version 2 implementation follows [AGENTS_V2.md](AGENTS_V2.md). The incremental slices cover the visual palette, persisted projects, OIDC authentication and ownership, work items, the board, operational links, topology comparisons, and project administration. The light visual tokens are documented in [docs/design-system.md](docs/design-system.md). Existing Version 1 operational features remain available.
 
 Projects can now be created at `/projects/new`. They persist in PostgreSQL, start empty, and can be updated or archived through the API. The additive `ProjectPersistence` migration backfills unique slugs for existing Version 1 projects and keeps the Commerce Demo ID and slug stable. See [docs/api.md](docs/api.md) for the project endpoints.
 
@@ -10,6 +10,8 @@ Work-item CRUD, filtering, assignment, state history, and iteration APIs are doc
 The board is available from each project at `/projects/{projectId}/boards`; see [docs/boards.md](docs/boards.md) for card actions, backlog filters, and tags.
 Work items can now link to project components. Topology component details show active linked work, and the project overview merges work activity with operational events. See [docs/operational-integration.md](docs/operational-integration.md).
 Topology filters, dependency provenance comparison, and an environment comparison table are described in [docs/topology-v2.md](docs/topology-v2.md).
+Project Components, Environments, and Settings pages and the expanded Commerce Demo are described in [docs/hardening.md](docs/hardening.md).
+The solo Version 2 delivery record is in [docs/iteration-plan-v2.md](docs/iteration-plan-v2.md).
 
 DevOpsPlatform is a diploma MVP for viewing a distributed system as one operational topology. It joins project and environment metadata, components and declared dependencies, deployment history, current runtime state, and operational events. Reverse dependency traversal shows which components may be affected by a failure.
 
@@ -72,6 +74,8 @@ No production migration runs automatically. Configure `FrontendOrigin` for the w
 3. Click **Analyze potential impact**. Order Service is direct; API Gateway and Web Frontend are indirect.
 4. With `NEXT_PUBLIC_ENABLE_DEMO=true` and the API in Development, click **Restore health**, then **Simulate degradation**. The node and recent events update through SSE without a page reload.
 
+For the Version 2 planning-to-operations flow, open Commerce Demo → Boards, create a Bug, assign it, move it to Active, and link Payment Service. Then open Topology, select Payment Service, inspect the linked work, trigger degradation, run impact analysis, recover, and close the Bug. See [docs/hardening.md](docs/hardening.md) for the complete path.
+
 The buttons call development-only API endpoints. Alternatively, update any component through `PUT /api/projects/{projectId}/environments/{environmentId}/components/{componentId}/runtime`.
 
 ## Checks
@@ -87,7 +91,7 @@ npm run typecheck
 npm run build
 ```
 
-`docker compose config` checks the Compose file. Automated backend tests cover graph traversal, seeded EF queries, and authenticated HTTP endpoint flows using the in-memory provider. The additive migrations were also applied to isolated fresh and Version 1 PostgreSQL databases, including a real identity-generated work-item number. The full Compose stack was smoke tested in a browser for OIDC sign-in, project creation, work-item creation, and a persisted board state change. A repeatable PostgreSQL integration test suite remains to be added.
+`docker compose config` checks the Compose file. Automated backend tests cover graph traversal, seeded EF queries, and authenticated HTTP endpoint flows using the in-memory provider. The additive migrations were also applied to isolated fresh and Version 1 PostgreSQL databases, including a real identity-generated work-item number. The full Compose stack was smoke tested in a browser for OIDC sign-in, project creation, a persisted board state change, seeded component links, real component/dependency creation, and environment comparison. See [docs/hardening.md](docs/hardening.md) for the verified path. A repeatable PostgreSQL integration test suite remains to be added.
 
 ## Scope
 

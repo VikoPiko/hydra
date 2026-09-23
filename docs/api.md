@@ -2,6 +2,8 @@
 
 Project management (Version 2 slice): `GET /api/projects` lists active projects; `?includeArchived=true` includes archived records. `GET /api/projects/{id}` returns a project. `POST /api/projects` accepts `name`, optional `description`, optional lowercase `slug`, and `visibility` (`Private` or `Internal`). If omitted, a slug is generated from the name. `PUT /api/projects/{id}` updates those fields. `POST /api/projects/{id}/archive` archives without deleting related data. Duplicate names or slugs return 409; invalid fields return 400. The `/projects/new` UI uses the same API.
 
+`GET /api/projects/{id}/members` lists members for any project member. Owners may use `POST /api/projects/{id}/members/by-email` with `email` and `role` after that person has signed in once. Components and Environments pages use the existing create/list APIs, and the Components form submits Declared dependencies.
+
 Work-item endpoints, filters, state and assignment rules are documented in [work-items.md](work-items.md). All `/api/*` endpoints require a validated OIDC bearer token; project-scoped routes also require membership.
 
 Operational integration: `GET /api/projects/{projectId}/work-item-component-links` lists project links. `POST` or `DELETE /api/work-items/{workItemId}/components/{componentId}` adds or removes a same-project link. `GET /api/components/{componentId}/work-items` lists active linked work; `?includeClosed=true` includes history. `GET /api/projects/{projectId}/activity?limit=50` merges persisted operational and work-item events. See [operational-integration.md](operational-integration.md).

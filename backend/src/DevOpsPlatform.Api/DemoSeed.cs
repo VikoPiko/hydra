@@ -9,7 +9,8 @@ public static class DemoSeed
     public static async Task SeedAsync(PlatformDbContext db, CancellationToken ct = default)
     {
         var projectId = Guid.Parse("10000000-0000-0000-0000-000000000001");
-        if (await db.Projects.AnyAsync(x => x.Id == projectId, ct)) return;
+        if (!await db.Projects.AnyAsync(x => x.Id == projectId, ct))
+        {
         var developmentId = Guid.Parse("20000000-0000-0000-0000-000000000001");
         var productionId = Guid.Parse("20000000-0000-0000-0000-000000000002");
         var names = new[] { "Web Frontend", "API Gateway", "Order Service", "Payment Service",
@@ -58,6 +59,69 @@ public static class DemoSeed
             new OperationalEvent { ProjectId = projectId, EnvironmentId = productionId, ComponentId = ids[3],
                 Type = OperationalEventType.HealthChanged, Severity = EventSeverity.Warning,
                 Title = "Payment Service health changed to Degraded", OccurredAt = at.AddMinutes(5), CreatedAt = at.AddMinutes(5) });
+        await db.SaveChangesAsync(ct);
+        }
+        await SeedWorkAsync(db, projectId, ct);
+    }
+
+    private static async Task SeedWorkAsync(PlatformDbContext db, Guid projectId, CancellationToken ct)
+    {
+        var at = new DateTimeOffset(2026, 9, 22, 10, 0, 0, TimeSpan.Zero);
+        var actor = await db.Users.FirstOrDefaultAsync(x => x.Issuer == "urn:devops:seed" && x.ExternalSubject == "commerce-demo", ct);
+        if (actor is null)
+        {
+            actor = new UserProfile { Id = Guid.Parse("40000000-0000-0000-0000-000000000001"),
+                Issuer = "urn:devops:seed", ExternalSubject = "commerce-demo", DisplayName = "Demo seed",
+                CreatedAt = at, LastSeenAt = at };
+            db.Users.Add(actor);
+        }
+        var examples = new (Guid Id, WorkItemType Type, string Title, WorkItemState State, WorkItemPriority Priority, int Minute)[]
+        {
+            (Guid.Parse("50000000-0000-0000-0000-000000000001"), WorkItemType.UserStory,
+                "As a customer, I want to place an order", WorkItemState.Active, WorkItemPriority.High, -40),
+            (Guid.Parse("50000000-0000-0000-0000-000000000002"), WorkItemType.Task,
+                "Implement order validation", WorkItemState.Active, WorkItemPriority.Medium, -30),
+            (Guid.Parse("50000000-0000-0000-0000-000000000003"), WorkItemType.Task,
+                "Integrate Payment Service", WorkItemState.Closed, WorkItemPriority.Medium, -20),
+            (Guid.Parse("50000000-0000-0000-0000-000000000004"), WorkItemType.Bug,
+                "Payment failures after deployment", WorkItemState.Active, WorkItemPriority.Critical, 10)
+        };
+        var createdBug = false;
+        foreach (var example in examples)
+        {
+            if (await db.WorkItems.AnyAsync(x => x.Id == example.Id, ct)) continue;
+            if (example.Id == examples[3].Id) createdBug = true;
+            var createdAt = at.AddMinutes(example.Minute);
+            db.WorkItems.Add(new WorkItem { Id = example.Id, ProjectId = projectId, Type = example.Type,
+                Title = example.Title, State = example.State, Priority = example.Priority,
+                Description = example.Type == WorkItemType.Bug ? "Payment errors appeared after the recent deployment; investigate correlation." : "Commerce Demo planning example.",
+                CreatedByUserId = actor.Id, CreatedAt = createdAt, UpdatedAt = createdAt,
+                ClosedAt = example.State == WorkItemState.Closed ? createdAt.AddMinutes(5) : null });
+            db.WorkItemActivities.Add(new WorkItemActivity { WorkItemId = example.Id, ActorUserId = actor.Id,
+                Type = WorkItemActivityType.Created, NewValue = example.Title, OccurredAt = createdAt });
+        }
+        var tagDefinitions = new[] { ("backend", "blue"), ("frontend", "purple"), ("production", "amber"), ("payments", "red") };
+        var tags = await db.Tags.Where(x => x.ProjectId == projectId).ToListAsync(ct);
+        foreach (var (name, color) in tagDefinitions)
+        {
+            if (tags.Any(x => x.Name == name)) continue;
+            var tag = new Tag { ProjectId = projectId, Name = name, ColorToken = color };
+            db.Tags.Add(tag);
+            tags.Add(tag);
+        }
+        var bugId = examples[3].Id;
+        var paymentId = Guid.Parse("30000000-0000-0000-0000-000000000004");
+        if (createdBug && await db.Components.AnyAsync(x => x.Id == paymentId && x.ProjectId == projectId, ct) &&
+            !await db.WorkItemComponentLinks.AnyAsync(x => x.WorkItemId == bugId && x.ComponentId == paymentId, ct))
+        {
+            db.WorkItemComponentLinks.Add(new WorkItemComponentLink { WorkItemId = bugId, ComponentId = paymentId });
+            db.WorkItemActivities.Add(new WorkItemActivity { WorkItemId = bugId, ActorUserId = actor.Id,
+                Type = WorkItemActivityType.ComponentLinked, FieldName = "Component", NewValue = paymentId.ToString(),
+                OccurredAt = at.AddMinutes(11) });
+        }
+        var paymentsTag = tags.Single(x => x.Name == "payments");
+        if (createdBug && !await db.WorkItemTags.AnyAsync(x => x.WorkItemId == bugId && x.TagId == paymentsTag.Id, ct))
+            db.WorkItemTags.Add(new WorkItemTag { WorkItemId = bugId, TagId = paymentsTag.Id });
         await db.SaveChangesAsync(ct);
     }
 }

@@ -119,9 +119,10 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
       <select aria-label="Filter component type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}><option value="">All types</option>{[...new Set(topology?.nodes.map(node => node.type) ?? [])].sort().map(type => <option key={type}>{type}</option>)}</select>
       <select aria-label="Filter health" value={healthFilter} onChange={e => setHealthFilter(e.target.value)}><option value="">All health</option>{["Healthy", "Degraded", "Unhealthy", "Unknown"].map(health => <option key={health}>{health}</option>)}</select>
       <select aria-label="Filter dependency source" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="">All sources</option>{["Declared", "Discovered", "Observed"].map(source => <option key={source}>{source}</option>)}</select>
+      <select aria-label="Inspect component" value={selectedId ?? ""} onChange={e => selectNode(e.target.value)}><option value="">Inspect component</option>{topology?.nodes.map(node => <option value={node.id} key={node.id}>{node.name}</option>)}</select>
       <button onClick={() => setRefreshKey(x => x + 1)}>Refresh</button><span className="toolbar-hint">Select a component to inspect impact</span></div>
     {error && <p className="error workspace-error">{error}</p>}
-    <div className="workspace-main"><div className="graph-area" role="img" aria-label="Interactive dependency topology">
+    <div className="workspace-main"><div className="graph-area" role="region" aria-label="Interactive dependency topology">
       <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => selectNode(node.id)} fitView fitViewOptions={{ padding: 0.25 }} minZoom={0.35} maxZoom={1.5} proOptions={{ hideAttribution: true }}>
         <Background color="var(--color-border-strong)" gap={26} size={1} /><Controls /><MiniMap nodeColor={node => {
           const component = (node.data as ComponentGraphNode["data"]).component;

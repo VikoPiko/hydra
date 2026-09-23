@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { auth, type BackendSession } from "@/auth";
 
 export default async function ProjectsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  if (!await auth()) redirect("/signin");
+  const session = await auth() as BackendSession | null;
+  if (!session || session.error) redirect("/signin");
   return children;
 }
