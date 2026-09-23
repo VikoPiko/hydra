@@ -136,11 +136,17 @@ h2 { letter-spacing:-.025em; }
 .board-tabs button.active { background:var(--color-primary-soft); color:var(--color-primary); font-weight:800; }
 .board-columns { display:grid; grid-template-columns:repeat(4,minmax(220px,1fr)); gap:14px; align-items:start; }
 .board-column { min-height:390px; background:var(--color-surface-subtle); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:13px; }
+.board-column.drop-target { border-color:var(--color-primary); background:var(--color-primary-soft); box-shadow:inset 0 0 0 2px var(--color-primary); }
+.board-hint { color:var(--color-text-muted); font-size:12px; margin:0 0 10px; }
 .board-column h2 { display:flex; align-items:center; justify-content:space-between; margin:1px 2px 14px; font-size:14px; }
 .board-column h2 span { background:var(--color-surface); color:var(--color-text-muted); padding:2px 7px; border-radius:20px; font-size:11px; }
 .board-cards { display:grid; gap:10px; }
 .board-empty { font-size:12px; text-align:center; margin:28px 0; }
 .work-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); box-shadow:var(--shadow-card); padding:13px; }
+.work-card[draggable="true"] { cursor:grab; }
+.work-card[draggable="true"]:active { cursor:grabbing; }
+.work-card.dragging { opacity:.45; }
+.drag-grip { color:var(--color-text-muted); font-size:16px; line-height:1; letter-spacing:-4px; margin-left:3px; }
 .work-card-head,.work-card-foot { display:flex; align-items:center; gap:7px; font-size:11px; }
 .work-card-head .priority { margin-left:auto; }
 .work-number { color:var(--color-text-muted); font-weight:700; }
