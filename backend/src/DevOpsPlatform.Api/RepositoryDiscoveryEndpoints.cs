@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using DevOpsPlatform.Application;
 using DevOpsPlatform.Domain;
+using DevOpsPlatform.Infrastructure;
 using DevOpsPlatform.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,8 @@ namespace DevOpsPlatform.Api;
 
 public sealed record CreateRepositoryConnection(RepositoryProvider Provider, string Name, string RepositoryUrl, string? DefaultBranch);
 public sealed record CreateDemoImport(string Name, string? Description, string? Slug, ProjectVisibility Visibility);
+public sealed record CreateRepositoryImport(string Name, string? Description, string? Slug, ProjectVisibility Visibility,
+    RepositoryProvider Provider, string RepositoryUrl, string? Branch);
 public sealed record UpdateDiscoveryOverride(string? Name, ComponentType? Type);
 
 public static partial class PlatformEndpoints
@@ -17,34 +20,11 @@ public static partial class PlatformEndpoints
     {
         api.MapPost("/projects/import-demo", async (CreateDemoImport request, ClaimsPrincipal principal,
             ProjectAccess access, PlatformDbContext db, CancellationToken ct) =>
-        {
-            if (!ValidName(request.Name) || request.Description?.Length > 2000 || !Enum.IsDefined(request.Visibility))
-                return Bad("Invalid project fields.");
-            var slug = request.Slug is null ? Slugify(request.Name) : request.Slug.Trim();
-            if (!ValidSlug(slug)) return Bad("Invalid project slug.");
-            if (await db.Projects.AnyAsync(x => x.Name == request.Name.Trim() || x.Slug == slug, ct))
-                return Conflict("Project name or slug already exists.");
-            var user = await access.GetUserAsync(principal, ct);
-            await using var transaction = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(ct) : null;
-            var project = new Project { Name = request.Name.Trim(), Description = request.Description?.Trim() ?? "",
-                Slug = slug, Visibility = request.Visibility, CreatedByUserId = user.Id };
-            var environment = new SystemEnvironment { ProjectId = project.Id, Name = "Production", Type = EnvironmentType.Production };
-            var connection = new RepositoryConnection { ProjectId = project.Id, Provider = RepositoryProvider.LocalDevelopment,
-                Name = "Bundled Commerce System", RepositoryUrl = "demo://commerce-system", DefaultBranch = "bundled" };
-            var scan = new RepositoryScan { RepositoryConnectionId = connection.Id, Branch = connection.DefaultBranch };
-            var job = new SynchronizationJob { ProjectId = project.Id, RepositoryConnectionId = connection.Id,
-                ScanId = scan.Id, Type = SynchronizationJobType.RepositoryScan, RequestedByUserId = user.Id };
-            db.Projects.Add(project);
-            db.ProjectMembers.Add(new ProjectMember { ProjectId = project.Id, UserId = user.Id, Role = ProjectRole.Owner });
-            db.Environments.Add(environment);
-            db.RepositoryConnections.Add(connection);
-            db.RepositoryScans.Add(scan);
-            db.SynchronizationJobs.Add(job);
-            await db.SaveChangesAsync(ct);
-            if (transaction is not null) await transaction.CommitAsync(ct);
-            return Results.Accepted($"/api/projects/{project.Id}/repository-connections/{connection.Id}/scans/{scan.Id}",
-                new { projectId = project.Id, environmentId = environment.Id, connectionId = connection.Id, scanId = scan.Id, jobId = job.Id });
-        });
+            await StartImportAsync(new(request.Name, request.Description, request.Slug, request.Visibility,
+                RepositoryProvider.LocalDevelopment, "demo://commerce-system", "bundled"), principal, access, db, ct));
+        api.MapPost("/projects/import", async (CreateRepositoryImport request, ClaimsPrincipal principal,
+            ProjectAccess access, PlatformDbContext db, CancellationToken ct) =>
+            await StartImportAsync(request, principal, access, db, ct));
 
         api.MapGet("/projects/{projectId:guid}/repository-connections", async (Guid projectId, PlatformDbContext db, CancellationToken ct) =>
             await db.RepositoryConnections.AsNoTracking().Where(x => x.ProjectId == projectId)
@@ -54,14 +34,13 @@ public static partial class PlatformEndpoints
             PlatformDbContext db, CancellationToken ct) =>
         {
             if (!await db.Projects.AnyAsync(x => x.Id == projectId && x.ArchivedAt == null, ct)) return Results.NotFound();
-            if (request.Provider != RepositoryProvider.LocalDevelopment || request.RepositoryUrl != "demo://commerce-system")
-                return Bad("This slice supports the bundled Commerce System repository only.");
-            if (!ValidName(request.Name) || request.DefaultBranch?.Length > 200) return Bad("Invalid repository name or branch.");
-            if (await db.RepositoryConnections.AnyAsync(x => x.ProjectId == projectId && x.RepositoryUrl == request.RepositoryUrl, ct))
+            if (!TryRepositorySource(request.Provider, request.RepositoryUrl, request.DefaultBranch, out var url, out var branch))
+                return Bad("Use the bundled demo or a public HTTPS GitHub repository and valid branch.");
+            if (!ValidName(request.Name)) return Bad("Invalid repository name.");
+            if (await db.RepositoryConnections.AnyAsync(x => x.ProjectId == projectId && x.RepositoryUrl == url, ct))
                 return Conflict("Repository is already connected to this project.");
             var connection = new RepositoryConnection { ProjectId = projectId, Provider = request.Provider,
-                Name = request.Name.Trim(), RepositoryUrl = request.RepositoryUrl,
-                DefaultBranch = request.DefaultBranch?.Trim() is { Length: > 0 } branch ? branch : "bundled" };
+                Name = request.Name.Trim(), RepositoryUrl = url, DefaultBranch = branch };
             db.RepositoryConnections.Add(connection);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/api/projects/{projectId}/repository-connections/{connection.Id}", connection);
@@ -276,6 +255,56 @@ public static partial class PlatformEndpoints
             await db.SaveChangesAsync(ct);
             return Results.Ok(component);
         });
+    }
+
+    private static async Task<IResult> StartImportAsync(CreateRepositoryImport request, ClaimsPrincipal principal,
+        ProjectAccess access, PlatformDbContext db, CancellationToken ct)
+    {
+        if (!ValidName(request.Name) || request.Description?.Length > 2000 || !Enum.IsDefined(request.Visibility))
+            return Bad("Invalid project fields.");
+        if (!TryRepositorySource(request.Provider, request.RepositoryUrl, request.Branch, out var url, out var branch))
+            return Bad("Use the bundled demo or a public HTTPS GitHub repository and valid branch.");
+        var slug = request.Slug is null ? Slugify(request.Name) : request.Slug.Trim();
+        if (!ValidSlug(slug)) return Bad("Invalid project slug.");
+        if (await db.Projects.AnyAsync(x => x.Name == request.Name.Trim() || x.Slug == slug, ct))
+            return Conflict("Project name or slug already exists.");
+        var user = await access.GetUserAsync(principal, ct);
+        await using var transaction = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(ct) : null;
+        var project = new Project { Name = request.Name.Trim(), Description = request.Description?.Trim() ?? "",
+            Slug = slug, Visibility = request.Visibility, CreatedByUserId = user.Id };
+        var environment = new SystemEnvironment { ProjectId = project.Id, Name = "Production", Type = EnvironmentType.Production };
+        var connection = new RepositoryConnection { ProjectId = project.Id, Provider = request.Provider,
+            Name = request.Provider == RepositoryProvider.LocalDevelopment ? "Bundled Commerce System" : new Uri(url).Segments[^1].Trim('/'),
+            RepositoryUrl = url, DefaultBranch = branch };
+        var scan = new RepositoryScan { RepositoryConnectionId = connection.Id, Branch = branch };
+        var job = new SynchronizationJob { ProjectId = project.Id, RepositoryConnectionId = connection.Id,
+            ScanId = scan.Id, Type = SynchronizationJobType.RepositoryScan, RequestedByUserId = user.Id };
+        db.Projects.Add(project);
+        db.ProjectMembers.Add(new ProjectMember { ProjectId = project.Id, UserId = user.Id, Role = ProjectRole.Owner });
+        db.Environments.Add(environment);
+        db.RepositoryConnections.Add(connection);
+        db.RepositoryScans.Add(scan);
+        db.SynchronizationJobs.Add(job);
+        await db.SaveChangesAsync(ct);
+        if (transaction is not null) await transaction.CommitAsync(ct);
+        return Results.Accepted($"/api/projects/{project.Id}/repository-connections/{connection.Id}/scans/{scan.Id}",
+            new { projectId = project.Id, environmentId = environment.Id, connectionId = connection.Id, scanId = scan.Id, jobId = job.Id });
+    }
+
+    private static bool TryRepositorySource(RepositoryProvider provider, string? repositoryUrl, string? defaultBranch,
+        out string normalizedUrl, out string normalizedBranch)
+    {
+        normalizedUrl = normalizedBranch = "";
+        if (provider == RepositoryProvider.LocalDevelopment && repositoryUrl == "demo://commerce-system")
+        {
+            normalizedUrl = repositoryUrl;
+            normalizedBranch = "bundled";
+            return true;
+        }
+        if (provider != RepositoryProvider.GitHub || !GitHubRepositoryScanner.TryNormalize(repositoryUrl, out normalizedUrl))
+            return false;
+        normalizedBranch = string.IsNullOrWhiteSpace(defaultBranch) ? "main" : defaultBranch.Trim();
+        return GitHubRepositoryScanner.ValidBranch(normalizedBranch);
     }
 
     private static string DiscoveryKey(DiscoveredComponent candidate) => $"{candidate.SourcePath}:{candidate.ExternalKey}";

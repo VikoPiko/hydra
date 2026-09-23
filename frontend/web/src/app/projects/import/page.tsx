@@ -9,6 +9,9 @@ export default function ImportProjectPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [source, setSource] = useState<"demo" | "github">("demo");
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [branch, setBranch] = useState("main");
   const [imported, setImported] = useState<ImportStart | null>(null);
   const [scan, setScan] = useState<RepositoryScan | null>(null);
   const [preview, setPreview] = useState<DiscoveryPreview | null>(null);
@@ -40,8 +43,10 @@ export default function ImportProjectPage() {
   async function begin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const result = await postJson<ImportStart>("/api/projects/import-demo",
-        { name, description, slug: null, visibility: "Private" });
+      const result = await postJson<ImportStart>("/api/projects/import",
+        { name, description, slug: null, visibility: "Private",
+          provider: source === "demo" ? "LocalDevelopment" : "GitHub",
+          repositoryUrl: source === "demo" ? "demo://commerce-system" : repositoryUrl, branch });
       setImported(result);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to start import."); }
     finally { setBusy(false); }
@@ -61,14 +66,16 @@ export default function ImportProjectPage() {
     <h1>Import an existing project</h1>
     <p className="lede">Scan repository configuration, review the discovered architecture, then apply it to the project.</p>
     {!imported && <form className="panel form-panel" onSubmit={begin}>
-      <h2>1 · Choose source</h2><label>Repository source<select defaultValue="demo"><option value="demo">Bundled Commerce System demo</option></select></label>
-      <p className="muted">This first V3 source reads the bundled example only. It does not execute repository files. Azure DevOps and remote Git connections follow in later integration slices.</p>
+      <h2>1 · Choose source</h2><label>Repository source<select value={source} onChange={event => setSource(event.target.value as "demo" | "github")}><option value="demo">Bundled Commerce System demo</option><option value="github">Public GitHub repository</option></select></label>
+      {source === "github" && <><label>Repository URL<input required type="url" value={repositoryUrl} onChange={event => setRepositoryUrl(event.target.value)} placeholder="https://github.com/owner/repository" /></label>
+        <label>Branch<input required value={branch} onChange={event => setBranch(event.target.value)} placeholder="main" /></label></>}
+      <p className="muted">GitHub import reads public repository configuration through the GitHub API. It never executes repository files. Private repositories and Azure DevOps follow in later integration slices.</p>
       <h2>2 · Project details</h2><label>Project name<input required minLength={2} maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Imported Commerce System" /></label>
       <label>Description<textarea maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} /></label>
       <p className="muted">Starting the scan creates a private project with an empty Production environment. Topology appears only after you review and apply the preview.</p>
       <div className="form-actions"><Link className="button" href="/projects">Cancel</Link><button className="button primary" disabled={busy}>{busy ? "Starting…" : "Create and scan"}</button></div>
     </form>}
-    {imported && <section className="panel"><h2>3 · Repository scan</h2><p><strong>{scan?.status ?? "Queued"}</strong> · Bundled Commerce System</p>
+    {imported && <section className="panel"><h2>3 · Repository scan</h2><p><strong>{scan?.status ?? "Queued"}</strong> · {source === "demo" ? "Bundled Commerce System" : repositoryUrl}</p>
       <p className="muted">{scan?.status === "Running" ? "Scanning safe configuration files and parsing Docker Compose." :
         scan?.status === "Failed" ? scan.errorMessage : scan?.completedAt ?
           `${scan.filesScanned} files scanned · ${scan.componentsDiscovered} components · ${scan.dependenciesDiscovered} dependencies · ${scan.warningsCount} warnings` : "Waiting for the background worker."}</p>
