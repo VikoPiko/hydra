@@ -22,6 +22,10 @@ export type Tag = { id: string; name: string; colorToken: string | null };
 export type WorkItemTag = { workItemId: string; tagId: string };
 export type WorkItemComponentLink = { workItemId: string; componentId: string };
 export type ProjectActivity = { id: string; occurredAt: string; kind: "Operational" | "WorkItem"; summary: string; actorName: string | null; componentId: string | null; workItemId: string | null; environmentId: string | null };
+export type DriftEdge = { sourceComponentId: string; sourceName: string; targetComponentId: string; targetName: string; type: string; lastObservedAt: string | null };
+export type Drift = { scope: "Project"; matching: DriftEdge[]; declaredOnly: DriftEdge[]; observedOnly: DriftEdge[]; discovered: DriftEdge[] };
+export type ComponentComparison = { componentId: string; name: string; leftHasData: boolean; rightHasData: boolean; leftVersion: string | null; rightVersion: string | null; leftHealth: Health | null; rightHealth: Health | null; different: boolean };
+export type EnvironmentComparison = { leftEnvironmentId: string; leftEnvironmentName: string; rightEnvironmentId: string; rightEnvironmentName: string; componentPresenceMeaning: string; dependencyScope: "Project"; declaredDependencyCount: number; components: ComponentComparison[] };
 
 export const apiBase = "";
 

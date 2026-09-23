@@ -142,7 +142,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<SystemComponent>().WithMany().HasForeignKey(x => x.SourceComponentId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<SystemComponent>().WithMany().HasForeignKey(x => x.TargetComponentId).OnDelete(DeleteBehavior.Cascade);
-            e.HasIndex(x => new { x.SourceComponentId, x.TargetComponentId, x.Type }).IsUnique();
+            e.HasIndex(x => new { x.SourceComponentId, x.TargetComponentId, x.Type, x.Source }).IsUnique();
             e.HasIndex(x => x.TargetComponentId);
         });
         model.Entity<Deployment>(e =>

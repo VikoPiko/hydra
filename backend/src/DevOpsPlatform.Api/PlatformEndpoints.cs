@@ -157,9 +157,11 @@ public static partial class PlatformEndpoints
                 (x.Id == request.SourceComponentId || x.Id == request.TargetComponentId), ct);
             if (count != 2) return Bad("Both components must belong to the project.");
             if (await db.Dependencies.AnyAsync(x => x.SourceComponentId == request.SourceComponentId &&
-                x.TargetComponentId == request.TargetComponentId && x.Type == request.Type, ct)) return Conflict("Dependency already exists.");
+                x.TargetComponentId == request.TargetComponentId && x.Type == request.Type && x.Source == request.Source, ct))
+                return Conflict("Dependency with this source already exists.");
             var dependency = new Dependency { ProjectId = projectId, SourceComponentId = request.SourceComponentId,
-                TargetComponentId = request.TargetComponentId, Type = request.Type, Source = request.Source };
+                TargetComponentId = request.TargetComponentId, Type = request.Type, Source = request.Source,
+                LastObservedAt = request.Source == DependencySource.Observed ? DateTimeOffset.UtcNow : null };
             db.Dependencies.Add(dependency);
             db.OperationalEvents.Add(new OperationalEvent { ProjectId = projectId, ComponentId = request.SourceComponentId,
                 Type = OperationalEventType.DependencyCreated, Severity = EventSeverity.Info, Title = "Dependency registered" });
@@ -198,6 +200,7 @@ public static partial class PlatformEndpoints
         MapLifecycleEndpoints(api, app.Environment.IsDevelopment());
         MapWorkItemEndpoints(api);
         MapOperationalIntegrationEndpoints(api);
+        MapTopologyComparisonEndpoints(api);
     }
 
     private static bool ValidName(string? name) => name?.Trim().Length is >= 2 and <= 120;

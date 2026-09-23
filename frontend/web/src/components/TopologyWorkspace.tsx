@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ReactFlow, Background, Controls, Handle, MiniMap, Position, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { apiBase, getJson, postJson, type Environment, type Impact, type OperationalEvent, type Project, type RuntimeState, type Topology, type TopologyNode, type Deployment, type WorkItem } from "@/lib/api";
+import { apiBase, getJson, postJson, type Drift, type Environment, type Impact, type OperationalEvent, type Project, type RuntimeState, type Topology, type TopologyNode, type Deployment, type WorkItem } from "@/lib/api";
 import { mapTopology } from "@/lib/graph";
 import { ProjectNav } from "./ProjectNav";
 
@@ -28,9 +28,13 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
   const [events, setEvents] = useState<OperationalEvent[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [linkedItems, setLinkedItems] = useState<WorkItem[]>([]);
+  const [drift, setDrift] = useState<Drift | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [impact, setImpact] = useState<Impact | null>(null);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [healthFilter, setHealthFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
   const [error, setError] = useState("");
   const [live, setLive] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -46,8 +50,9 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
     Promise.all([
       getJson<Topology>(`/api/projects/${projectId}/environments/${environmentId}/topology`),
       getJson<OperationalEvent[]>(`/api/projects/${projectId}/environments/${environmentId}/events?limit=8`),
-      getJson<Deployment[]>(`/api/projects/${projectId}/environments/${environmentId}/deployments`)
-    ]).then(([t, e, d]) => { setTopology(t); setEvents(e); setDeployments(d); setError(""); }).catch(e => setError(e.message));
+      getJson<Deployment[]>(`/api/projects/${projectId}/environments/${environmentId}/deployments`),
+      getJson<Drift>(`/api/projects/${projectId}/environments/${environmentId}/architecture-drift`)
+    ]).then(([t, e, d, comparison]) => { setTopology(t); setEvents(e); setDeployments(d); setDrift(comparison); setError(""); }).catch(e => setError(e.message));
   }, [projectId, environmentId]);
   useEffect(() => { refresh(); }, [refresh, refreshKey]);
   useEffect(() => {
@@ -77,7 +82,16 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
       .catch(cause => { if (current) setError(cause instanceof Error ? cause.message : "Unable to load linked work items."); });
     return () => { current = false; };
   }, [selectedId, refreshKey]);
-  const graph = useMemo(() => topology ? mapTopology(topology, selectedId, impact, search) : { nodes: [], edges: [] }, [topology, selectedId, impact, search]);
+  const visibleTopology = useMemo(() => {
+    if (!topology) return null;
+    const nodes = topology.nodes.filter(node => (!typeFilter || node.type === typeFilter) &&
+      (!healthFilter || node.health === healthFilter));
+    const visibleIds = new Set(nodes.map(node => node.id));
+    const edges = topology.edges.filter(edge => (!sourceFilter || edge.sourceKind === sourceFilter) &&
+      visibleIds.has(edge.source) && visibleIds.has(edge.target));
+    return { ...topology, nodes, edges };
+  }, [topology, typeFilter, healthFilter, sourceFilter]);
+  const graph = useMemo(() => visibleTopology ? mapTopology(visibleTopology, selectedId, impact, search) : { nodes: [], edges: [] }, [visibleTopology, selectedId, impact, search]);
   const selected = topology?.nodes.find(n => n.id === selectedId);
   const dependencies = topology?.edges.filter(e => e.source === selectedId) ?? [];
   const dependents = topology?.edges.filter(e => e.target === selectedId) ?? [];
@@ -102,15 +116,19 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
     <ProjectNav projectId={projectId} active="Topology" />
     <div className="workspace-toolbar"><label>Environment <select value={environmentId} onChange={e => setEnvironmentId(e.target.value)}>{environments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
       <input aria-label="Search components" placeholder="Search components…" value={search} onChange={e => setSearch(e.target.value)} />
+      <select aria-label="Filter component type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}><option value="">All types</option>{[...new Set(topology?.nodes.map(node => node.type) ?? [])].sort().map(type => <option key={type}>{type}</option>)}</select>
+      <select aria-label="Filter health" value={healthFilter} onChange={e => setHealthFilter(e.target.value)}><option value="">All health</option>{["Healthy", "Degraded", "Unhealthy", "Unknown"].map(health => <option key={health}>{health}</option>)}</select>
+      <select aria-label="Filter dependency source" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="">All sources</option>{["Declared", "Discovered", "Observed"].map(source => <option key={source}>{source}</option>)}</select>
       <button onClick={() => setRefreshKey(x => x + 1)}>Refresh</button><span className="toolbar-hint">Select a component to inspect impact</span></div>
     {error && <p className="error workspace-error">{error}</p>}
     <div className="workspace-main"><div className="graph-area" role="img" aria-label="Interactive dependency topology">
       <ReactFlow nodes={graph.nodes} edges={graph.edges} nodeTypes={nodeTypes} onNodeClick={(_, node) => selectNode(node.id)} fitView fitViewOptions={{ padding: 0.25 }} minZoom={0.35} maxZoom={1.5} proOptions={{ hideAttribution: true }}>
-        <Background color="#294257" gap={26} size={1} /><Controls /><MiniMap nodeColor={node => {
+        <Background color="var(--color-border-strong)" gap={26} size={1} /><Controls /><MiniMap nodeColor={node => {
           const component = (node.data as ComponentGraphNode["data"]).component;
-          return component.health === "Degraded" ? "#e7ad5b" : component.health === "Unhealthy" ? "#e47676" : "#4bc7a7";
+          return component.health === "Degraded" ? "var(--color-warning)" : component.health === "Unhealthy" ? "var(--color-danger)" : "var(--color-success)";
         }} /></ReactFlow>
       {!topology && <div className="graph-loading">Loading topology…</div>}
+      {visibleTopology && visibleTopology.nodes.length === 0 && <div className="graph-loading">{topology?.nodes.length ? "No components match these filters." : "No components yet. Add one through the project API to build a topology."}</div>}
       <div className="graph-legend"><span>● Healthy</span><span>● Degraded</span><span>● Unhealthy</span><span>● Unknown</span></div>
     </div><aside className="detail-panel">
       {selected ? <><div className="eyebrow">COMPONENT DETAIL</div><h2>{selected.name}</h2><div className="detail-subtitle">{selected.type} · <span className={`text-${selected.health.toLowerCase()}`}>{selected.health}</span></div>
@@ -127,6 +145,7 @@ export function TopologyWorkspace({ projectId }: { projectId: string }) {
       </> : <div className="empty-detail"><span>◎</span><h2>Select a component</h2><p>Inspect health, deployment, dependencies, and potential impact.</p></div>}
     </aside></div>
     <section className="timeline"><div className="timeline-heading"><h2>Recent operational events</h2><Link href={`/projects/${projectId}/events`}>View all →</Link></div><div className="timeline-items">{events.map(e => <div className="timeline-item" key={e.id}><span className={`severity ${e.severity.toLowerCase()}`}>{e.severity}</span><div><strong>{e.title}</strong><small>{componentName(e.componentId)} · {new Date(e.occurredAt).toLocaleString()}</small></div></div>)}</div></section>
+    {drift && <section className="timeline"><div className="timeline-heading"><h2>Dependency provenance</h2><span className="muted">Project-wide comparison</span></div><p className="muted">Potential architecture drift reflects recorded data only. Missing observations may mean telemetry has not been supplied.</p><div className="drift-summary"><span>{drift.matching.length} declared and observed</span><span>{drift.declaredOnly.length} declared only</span><span>{drift.observedOnly.length} observed only</span><span>{drift.discovered.length} discovered</span></div>{[...drift.declaredOnly.map(edge => ({ edge, label: "Declared only" })), ...drift.observedOnly.map(edge => ({ edge, label: "Observed only" }))].map(({ edge, label }) => <div className="list-row" key={`${label}-${edge.sourceComponentId}-${edge.targetComponentId}-${edge.type}`}><span className="version">{label}</span><div><strong>{edge.sourceName} → {edge.targetName}</strong><small>{edge.type}</small></div></div>)}</section>}
   </main>;
 }
 

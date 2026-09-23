@@ -6,6 +6,8 @@ Work-item endpoints, filters, state and assignment rules are documented in [work
 
 Operational integration: `GET /api/projects/{projectId}/work-item-component-links` lists project links. `POST` or `DELETE /api/work-items/{workItemId}/components/{componentId}` adds or removes a same-project link. `GET /api/components/{componentId}/work-items` lists active linked work; `?includeClosed=true` includes history. `GET /api/projects/{projectId}/activity?limit=50` merges persisted operational and work-item events. See [operational-integration.md](operational-integration.md).
 
+Topology comparison: `GET /api/projects/{projectId}/environments/{environmentId}/architecture-drift` reports project-wide dependency provenance. `GET /api/projects/{projectId}/environment-comparison?leftEnvironmentId={id}&rightEnvironmentId={id}` compares recorded versions and health. Both are explained in [topology-v2.md](topology-v2.md).
+
 Development OpenAPI JSON is served at `/openapi/v1.json`. Responses use ordinary JSON DTOs; errors use Problem Details. All IDs are GUIDs and enum values are JSON strings.
 
 | Capability | Endpoints |
@@ -15,6 +17,7 @@ Development OpenAPI JSON is served at `/openapi/v1.json`. Responses use ordinary
 | Components | `GET`, `POST /api/projects/{projectId}/components`; `GET /api/components/{componentId}` |
 | Dependencies | `GET`, `POST /api/projects/{projectId}/dependencies` |
 | Topology | `GET /api/projects/{projectId}/environments/{environmentId}/topology` |
+| Topology comparison | `GET /api/projects/{projectId}/environments/{environmentId}/architecture-drift`, `GET /api/projects/{projectId}/environment-comparison` |
 | Potential impact | `GET /api/projects/{projectId}/components/{componentId}/impact` |
 | Deployments | `GET /api/projects/{projectId}/environments/{environmentId}/deployments`, `GET /api/components/{componentId}/deployments`, `POST /api/projects/{projectId}/deployments` |
 | Runtime state | `GET /api/projects/{projectId}/environments/{environmentId}/runtime`, `PUT /api/projects/{projectId}/environments/{environmentId}/components/{componentId}/runtime` |

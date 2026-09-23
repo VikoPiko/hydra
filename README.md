@@ -9,6 +9,7 @@ OIDC sign-in and project ownership are now required for `/api/*` and `/projects/
 Work-item CRUD, filtering, assignment, state history, and iteration APIs are documented in [docs/work-items.md](docs/work-items.md).
 The board is available from each project at `/projects/{projectId}/boards`; see [docs/boards.md](docs/boards.md) for card actions, backlog filters, and tags.
 Work items can now link to project components. Topology component details show active linked work, and the project overview merges work activity with operational events. See [docs/operational-integration.md](docs/operational-integration.md).
+Topology filters, dependency provenance comparison, and an environment comparison table are described in [docs/topology-v2.md](docs/topology-v2.md).
 
 DevOpsPlatform is a diploma MVP for viewing a distributed system as one operational topology. It joins project and environment metadata, components and declared dependencies, deployment history, current runtime state, and operational events. Reverse dependency traversal shows which components may be affected by a failure.
 

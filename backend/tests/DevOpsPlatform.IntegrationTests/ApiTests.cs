@@ -19,6 +19,53 @@ namespace DevOpsPlatform.IntegrationTests;
 public class ApiTests
 {
     [Fact]
+    public async Task DriftAndEnvironmentComparisonUseRecordedProvenanceAndState()
+    {
+        await using var factory = new TestFactory();
+        using var client = factory.CreateAuthenticatedClient();
+        var project = await Post(client, "/api/projects", new { name = "Comparison Project" });
+        var projectId = project.GetProperty("id").GetGuid();
+        var left = await Post(client, $"/api/projects/{projectId}/environments", new { name = "Staging", type = "Staging" });
+        var right = await Post(client, $"/api/projects/{projectId}/environments", new { name = "Production", type = "Production" });
+        var leftId = left.GetProperty("id").GetGuid();
+        var rightId = right.GetProperty("id").GetGuid();
+        var a = await Post(client, $"/api/projects/{projectId}/components", new { name = "API", type = "Service" });
+        var b = await Post(client, $"/api/projects/{projectId}/components", new { name = "Database", type = "Database" });
+        var c = await Post(client, $"/api/projects/{projectId}/components", new { name = "Worker", type = "Worker" });
+        var aId = a.GetProperty("id").GetGuid();
+        var bId = b.GetProperty("id").GetGuid();
+        var cId = c.GetProperty("id").GetGuid();
+        await Post(client, $"/api/projects/{projectId}/dependencies", new { sourceComponentId = aId, targetComponentId = bId, type = "Database", source = "Declared" });
+        await Post(client, $"/api/projects/{projectId}/dependencies", new { sourceComponentId = aId, targetComponentId = bId, type = "Database", source = "Observed" });
+        await Post(client, $"/api/projects/{projectId}/dependencies", new { sourceComponentId = bId, targetComponentId = cId, type = "Messaging", source = "Declared" });
+        await Post(client, $"/api/projects/{projectId}/dependencies", new { sourceComponentId = cId, targetComponentId = aId, type = "Http", source = "Observed" });
+        await Post(client, $"/api/projects/{projectId}/dependencies", new { sourceComponentId = aId, targetComponentId = cId, type = "Http", source = "Discovered" });
+        var drift = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/environments/{leftId}/architecture-drift");
+        Assert.Equal("Project", drift.GetProperty("scope").GetString());
+        Assert.Single(drift.GetProperty("matching").EnumerateArray());
+        Assert.Single(drift.GetProperty("declaredOnly").EnumerateArray());
+        Assert.Single(drift.GetProperty("observedOnly").EnumerateArray());
+        Assert.Single(drift.GetProperty("discovered").EnumerateArray());
+
+        await Post(client, $"/api/projects/{projectId}/deployments", new { environmentId = leftId, componentId = aId,
+            version = "1.0", status = "Succeeded" });
+        await Post(client, $"/api/projects/{projectId}/deployments", new { environmentId = rightId, componentId = aId,
+            version = "1.1", status = "Succeeded" });
+        var runtime = await client.PutAsJsonAsync($"/api/projects/{projectId}/environments/{leftId}/components/{aId}/runtime",
+            new { healthStatus = "Degraded" });
+        Assert.Equal(HttpStatusCode.OK, runtime.StatusCode);
+        var comparison = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/environment-comparison?leftEnvironmentId={leftId}&rightEnvironmentId={rightId}");
+        Assert.Equal("Project", comparison.GetProperty("dependencyScope").GetString());
+        Assert.Equal(2, comparison.GetProperty("declaredDependencyCount").GetInt32());
+        var apiRow = Assert.Single(comparison.GetProperty("components").EnumerateArray(), x => x.GetProperty("componentId").GetGuid() == aId);
+        Assert.Equal("1.0", apiRow.GetProperty("leftVersion").GetString());
+        Assert.Equal("1.1", apiRow.GetProperty("rightVersion").GetString());
+        Assert.Equal("Degraded", apiRow.GetProperty("leftHealth").GetString());
+        Assert.True(apiRow.GetProperty("different").GetBoolean());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/projects/{projectId}/environment-comparison?leftEnvironmentId={leftId}&rightEnvironmentId={leftId}")).StatusCode);
+    }
+
+    [Fact]
     public async Task ComponentLinksAndUnifiedActivityStayWithinProject()
     {
         await using var factory = new TestFactory();

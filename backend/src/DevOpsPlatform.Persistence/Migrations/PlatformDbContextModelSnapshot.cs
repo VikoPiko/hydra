@@ -59,7 +59,7 @@ namespace DevOpsPlatform.Persistence.Migrations
 
                     b.HasIndex("TargetComponentId");
 
-                    b.HasIndex("SourceComponentId", "TargetComponentId", "Type")
+                    b.HasIndex("SourceComponentId", "TargetComponentId", "Type", "Source")
                         .IsUnique();
 
                     b.ToTable("Dependencies");

@@ -33,7 +33,7 @@ export function mapTopology(topology: Topology, selectedId: string | null, impac
   });
   const edges: Edge[] = topology.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target,
     label: `${edge.type} · ${edge.sourceKind}`, type: "smoothstep", animated: false,
-    style: { stroke: selectedId && (edge.source === selectedId || edge.target === selectedId) ? "#52d6b5" : "#607589", strokeWidth: 1.5 },
-    labelStyle: { fill: "#9eb1c4", fontSize: 10 }, labelBgStyle: { fill: "#162432", fillOpacity: 0.9 } }));
+    style: { stroke: selectedId && (edge.source === selectedId || edge.target === selectedId) ? "var(--color-primary)" : "var(--color-border-strong)", strokeWidth: 1.5 },
+    labelStyle: { fill: "var(--color-text-secondary)", fontSize: 10 }, labelBgStyle: { fill: "var(--color-surface)", fillOpacity: 0.95 } }));
   return { nodes, edges };
 }

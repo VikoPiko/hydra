@@ -5,6 +5,7 @@ export function ProjectNav({ projectId, active }: { projectId: string; active: s
     ["Overview", `/projects/${projectId}`],
     ["Boards", `/projects/${projectId}/boards`],
     ["Topology", `/projects/${projectId}/topology`],
+    ["Compare", `/projects/${projectId}/comparison`],
     ["Events", `/projects/${projectId}/events`],
     ["Deployments", `/projects/${projectId}/deployments`]
   ];
